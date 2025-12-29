@@ -41,6 +41,9 @@
     <!-- High-performance I/O -->
     <PackageVersion Include="System.IO.Pipelines" Version="8.0.0" />
     
+    <!-- Scripting -->
+    <PackageVersion Include="NLua" Version="1.7.3" />
+    
     <!-- Testing -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageVersion Include="xunit" Version="2.6.4" />
@@ -48,5 +51,15 @@
     <PackageVersion Include="FluentAssertions" Version="6.12.0" />
     <PackageVersion Include="Moq" Version="4.20.70" />
     <PackageVersion Include="coverlet.collector" Version="6.0.0" />
+    
+    <!-- Web API -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR" Version="1.1.0" />
+    
+    <!-- Testing Web API -->
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.0" />
   </ItemGroup>
 </Project>

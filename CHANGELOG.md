@@ -8,6 +8,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Web-based Admin Panel**: Modern Angular/Bootstrap admin interface
+  - Setup wizard for initial server configuration (5 steps)
+  - Dashboard with real-time server statistics and status
+  - User management with search, filtering, and connection control
+  - Channel management with CRUD operations and mode editing
+  - Operator management with flag/permission configuration
+  - Ban management (K-lines, G-lines, Z-lines) with expiration
+  - Server configuration editor with IRCv3 capability toggles
+  - MOTD editor with preview
+  - Dark theme with Bootstrap 5 and FontAwesome icons
+  - JWT authentication with refresh tokens
+  - REST API for all admin operations
+- **Real-time Admin Panel Updates**: SignalR WebSocket integration
+  - AdminHub: WebSocket hub for log streaming, statistics, user events
+  - SignalRSerilogSink: Real-time log forwarding to connected clients
+  - StatsBackgroundService: Broadcasts server stats every 5 seconds
+  - Live log viewer with level filtering and search
+  - Log file browser with download and cleanup operations
+  - Real-time connection indicator on dashboard
+- **Admin Panel API Tests**: Comprehensive test coverage for REST API
+  - AuthControllerTests: Login, refresh token, authentication flows
+  - StatusControllerTests: Server status, health, restart, shutdown
+  - ConfigControllerTests: Configuration, MOTD, rate limits
+  - UsersControllerTests: User listing and management
+  - OperatorsControllerTests: Operator management and creation
+  - LogsControllerTests: Log access with security validation
+  - JwtServiceTests: Token generation and validation
+- **Lua Scripting Engine**: Extend server with Lua scripts
+  - NLua-based scripting with sandboxed execution
+  - Event handlers: on_message, on_join, on_part, on_nick, on_connect, etc.
+  - IRC API bindings: SendMessage, SendNotice, Kick, Ban, SetMode
+  - Script hot-reload and timer support
+  - Operator commands: LOADSCRIPT, UNLOADSCRIPT, SCRIPTS, RELOADSCRIPT
+- **JSON Trigger System**: Automated event-driven responses
+  - Condition types: Regex, Wildcard, Contains, Command, Always
+  - Action types: Reply, Notice, Kick, Ban, KickBan, Mode, Block, Log
+  - Cooldown support with per-user, per-channel, or global scope
+  - Time-of-day and day-of-week scheduling
+  - Operator commands: TRIGGERS, TRIGGERENABLE, RELOADTRIGGERS
+- **C# Plugin System**: Full-featured plugin architecture
+  - IPlugin interface with lifecycle hooks (OnLoad, OnUnload, OnEnable, OnDisable)
+  - AssemblyLoadContext-based plugin isolation for safe loading/unloading
+  - plugin.json manifest for metadata and dependencies
+  - IPluginContext for DI access, command/event registration, logging
+  - Scheduled and recurring task support
+  - Operator commands: PLUGINS, LOADPLUGIN, UNLOADPLUGIN, RELOADPLUGIN
+- **OperServ Network Service**: Full IRC operator administration service
+  - AKILL ADD/DEL/LIST: Network-wide autokills with duration parsing
+  - JUPE: Block server names from linking
+  - STATS: Display network statistics and server links
+  - MODE/KICK/KILL: Force operations on users/channels
+  - GLOBAL: Send network-wide notices
+  - RAW: Send raw S2S commands (with confirmation)
+  - RESTART/DIE: Server lifecycle management with confirmation
+- **S2S Protocol Enhancements**: Complete server linking protocol
+  - ENCAP sub-handlers: AKILL, UNAKILL, LOGIN, LOGOUT, CERTFP, SASL, KLINE, UNKLINE
+  - EncapSubHandlers class for extensible encapsulated command processing
+  - Jupe ban type for blocking server links
+- **Netsplit Handling**: Automatic reconnection for server links
+  - NetsplitHandler with exponential backoff reconnection
+  - Configurable delays (15s initial, 5m max)
+  - NetsplitDetected/NetsplitHealed events
+  - ReconnectStatus tracking for monitoring
+- **IS2SConnector Interface**: Improved S2S connection management
+  - TryConnectAsync with password handshake
+  - Event-based connection notifications
+- **S2S Protocol Documentation**: Comprehensive docs/S2S_PROTOCOL.md
+  - Connection flow and handshake sequence
+  - UID/SID format specification
+  - Burst sequence (SERVER, UID, SJOIN)
+  - All S2S commands with examples
+  - Network services documentation
+  - Netsplit handling and recovery
 - **WebSocket Support**: Browser-based IRC connections
   - WebSocketConnection: Wraps WebSocket as IClientConnection
   - WebSocketListener: HTTP upgrade with CORS origin validation

@@ -31,7 +31,19 @@ public enum UserMode
     Secure = 1 << 6,
 
     /// <summary>User is a bot (+B).</summary>
-    Bot = 1 << 7
+    Bot = 1 << 7,
+
+    /// <summary>User has caller-ID enabled (+g).</summary>
+    CallerID = 1 << 8,
+
+    /// <summary>User only accepts PMs from registered users (+R).</summary>
+    RegisteredPmOnly = 1 << 9,
+
+    /// <summary>User receives oper-wallops (+W).</summary>
+    OperWallops = 1 << 10,
+
+    /// <summary>User is connected via SSL and wants +Z visible (+z).</summary>
+    SecureOnly = 1 << 11
 }
 
 /// <summary>
@@ -54,6 +66,10 @@ public static class UserModeExtensions
             'r' => UserMode.Registered,
             'Z' => UserMode.Secure,
             'B' => UserMode.Bot,
+            'g' => UserMode.CallerID,
+            'R' => UserMode.RegisteredPmOnly,
+            'W' => UserMode.OperWallops,
+            'z' => UserMode.SecureOnly,
             _ => null
         };
     }
@@ -73,6 +89,10 @@ public static class UserModeExtensions
             UserMode.Registered => 'r',
             UserMode.Secure => 'Z',
             UserMode.Bot => 'B',
+            UserMode.CallerID => 'g',
+            UserMode.RegisteredPmOnly => 'R',
+            UserMode.OperWallops => 'W',
+            UserMode.SecureOnly => 'z',
             _ => ' '
         };
     }

@@ -51,8 +51,12 @@ public sealed class SjoinHandler : S2SCommandHandlerBase
             modeParams.Add(p[i]);
         }
 
-        // Process locally
-        // This would be handled by the channel manager in the main server
+        // Process via BurstManager
+        var burstManager = GetService<IBurstManager>(context);
+        if (burstManager != null)
+        {
+            burstManager.ProcessSjoin(channel, timestamp, modes, users);
+        }
 
         // Propagate to other servers
         await context.BroadcastAsync(context.Message, cancellationToken);

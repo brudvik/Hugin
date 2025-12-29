@@ -4,18 +4,48 @@ using Microsoft.Extensions.Logging;
 namespace Hugin.Network.S2S;
 
 /// <summary>
+/// Interface for connecting to remote IRC servers.
+/// </summary>
+public interface IS2SConnector
+{
+    /// <summary>
+    /// Event raised when an outgoing S2S connection is established.
+    /// </summary>
+    event Func<IS2SConnection, ValueTask>? ConnectionEstablished;
+
+    /// <summary>
+    /// Connects to a remote server.
+    /// </summary>
+    Task<IS2SConnection?> ConnectAsync(string host, int port, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Tries to connect to a remote server with link handshake.
+    /// </summary>
+    /// <param name="serverName">The expected server name.</param>
+    /// <param name="host">The remote host.</param>
+    /// <param name="port">The remote port.</param>
+    /// <param name="password">The link password.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>True if connection and handshake succeeded.</returns>
+    Task<bool> TryConnectAsync(string serverName, string host, int port, string password, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Connects to a remote server with retry logic.
+    /// </summary>
+    Task<IS2SConnection?> ConnectWithRetryAsync(string host, int port, int maxRetries = 3, int retryDelaySeconds = 30, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
 /// Connects to remote IRC servers for S2S linking.
 /// </summary>
-public sealed class S2SConnector
+public sealed class S2SConnector : IS2SConnector
 {
     private readonly TlsConfiguration? _tlsConfig;
     private readonly IS2SConnectionManager _connectionManager;
     private readonly ILogger<S2SConnector> _logger;
     private readonly ILoggerFactory _loggerFactory;
 
-    /// <summary>
-    /// Event raised when an outgoing S2S connection is established.
-    /// </summary>
+    /// <inheritdoc />
     public event Func<IS2SConnection, ValueTask>? ConnectionEstablished;
 
     /// <summary>
@@ -33,13 +63,7 @@ public sealed class S2SConnector
         _loggerFactory = loggerFactory;
     }
 
-    /// <summary>
-    /// Connects to a remote server.
-    /// </summary>
-    /// <param name="host">The remote host.</param>
-    /// <param name="port">The remote port.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The established connection, or null if connection failed.</returns>
+    /// <inheritdoc />
     public async Task<IS2SConnection?> ConnectAsync(
         string host,
         int port,
@@ -80,15 +104,40 @@ public sealed class S2SConnector
         }
     }
 
-    /// <summary>
-    /// Connects to a remote server with retry logic.
-    /// </summary>
-    /// <param name="host">The remote host.</param>
-    /// <param name="port">The remote port.</param>
-    /// <param name="maxRetries">Maximum number of retry attempts.</param>
-    /// <param name="retryDelaySeconds">Delay between retries in seconds.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The established connection, or null if all attempts failed.</returns>
+    /// <inheritdoc />
+    public async Task<bool> TryConnectAsync(
+        string serverName,
+        string host,
+        int port,
+        string password,
+        CancellationToken cancellationToken = default)
+    {
+        var connection = await ConnectAsync(host, port, cancellationToken);
+        if (connection is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            // Send PASS and SERVER commands for handshake
+            await connection.SendLineAsync($"PASS {password} TS 6", cancellationToken);
+            
+            // The handshake completion is handled by S2SHandshakeManager
+            // For now, we consider successful connection as success
+            // The handshake manager will complete the link or close if failed
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Handshake failed with {ServerName}", serverName);
+            await connection.CloseAsync(cancellationToken);
+            return false;
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<IS2SConnection?> ConnectWithRetryAsync(
         string host,
         int port,

@@ -250,3 +250,104 @@ public sealed class TraceHandler : CommandHandlerBase
             cancellationToken);
     }
 }
+
+/// <summary>
+/// Handles the client-side SQUIT command.
+/// Disconnects a server from the network. Operator only.
+/// </summary>
+/// <remarks>
+/// RFC 2812: SQUIT server :comment
+/// Unlike the S2S SQUIT command, this is sent by operators to request
+/// a server disconnect.
+/// </remarks>
+public sealed class ClientSquitHandler : CommandHandlerBase
+{
+    /// <inheritdoc />
+    public override string Command => "SQUIT";
+
+    /// <inheritdoc />
+    public override int MinimumParameters => 1;
+
+    /// <inheritdoc />
+    public override bool RequiresRegistration => true;
+
+    /// <inheritdoc />
+    public override async ValueTask HandleAsync(CommandContext context, CancellationToken cancellationToken = default)
+    {
+        var user = context.User;
+        var nick = user.Nickname!.Value;
+
+        // SQUIT requires operator privileges
+        if (!user.Modes.HasFlag(UserMode.Operator))
+        {
+            await context.ReplyAsync(
+                IrcNumerics.NoPrivileges(context.ServerName, nick),
+                cancellationToken);
+            return;
+        }
+
+        var targetServer = context.Message.Parameters[0];
+        var reason = context.Message.Parameters.Count > 1
+            ? context.Message.Parameters[1]
+            : $"SQUIT by {nick}";
+
+        // Check if target is this server
+        if (targetServer.Equals(context.ServerName, StringComparison.OrdinalIgnoreCase))
+        {
+            await context.ReplyAsync(
+                IrcMessage.CreateWithSource(context.ServerName, "NOTICE", nick,
+                    ":Cannot SQUIT self"),
+                cancellationToken);
+            return;
+        }
+
+        // Try to get the server link manager via the service resolver
+        // This uses the IServerLinkInfo interface which should be in Core
+        var linkInfo = context.ServiceProvider(typeof(Core.Interfaces.IServerLinkInfo))
+            as Core.Interfaces.IServerLinkInfo;
+
+        if (linkInfo == null)
+        {
+            await context.ReplyAsync(
+                IrcNumerics.NoSuchServer(context.ServerName, nick, targetServer),
+                cancellationToken);
+            return;
+        }
+
+        if (!linkInfo.IsServerLinked(targetServer))
+        {
+            await context.ReplyAsync(
+                IrcNumerics.NoSuchServer(context.ServerName, nick, targetServer),
+                cancellationToken);
+            return;
+        }
+
+        // Request disconnect via callback
+        var disconnected = await linkInfo.DisconnectServerAsync(targetServer, reason, cancellationToken);
+
+        if (disconnected)
+        {
+            // Send notice to operator
+            await context.ReplyAsync(
+                IrcMessage.CreateWithSource(context.ServerName, "NOTICE", nick,
+                    $":Disconnecting server {targetServer}: {reason}"),
+                cancellationToken);
+
+            // Broadcast WALLOPS to all operators
+            var wallopsMsg = IrcMessage.CreateWithSource(context.ServerName, "WALLOPS",
+                $":{nick} issued SQUIT for {targetServer} ({reason})");
+            
+            foreach (var oper in context.Users.GetAll().Where(u => u.Modes.HasFlag(UserMode.Operator)))
+            {
+                await context.Broker.SendToConnectionAsync(oper.ConnectionId, wallopsMsg.ToString(), cancellationToken);
+            }
+        }
+        else
+        {
+            await context.ReplyAsync(
+                IrcMessage.CreateWithSource(context.ServerName, "NOTICE", nick,
+                    $":Failed to disconnect server {targetServer}"),
+                cancellationToken);
+        }
+    }
+}

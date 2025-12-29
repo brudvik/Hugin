@@ -1,6 +1,6 @@
 # 🐦 Hugin IRC Server
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/yourusername/hugin/build.yml?branch=main)](https://github.com/yourusername/hugin/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/brudvik/hugin/build.yml?branch=main)](https://github.com/brudvik/hugin/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)](https://dotnet.microsoft.com/)
 
@@ -16,6 +16,21 @@ A modern, security-focused IRC server written in C# that follows RFC and IRCv3 s
 - **Scalable**: Designed for thousands of concurrent users
 - **Server Linking**: S2S protocol for multi-server networks
 - **Persistent Storage**: PostgreSQL backend for user accounts and channel history
+- **Extensible**: Lua scripting, JSON triggers, and C# plugins for custom functionality
+
+## 🎛️ Admin Panel
+
+Hugin includes a modern web-based admin panel for easy server management:
+
+- **Setup Wizard**: Guided 5-step initial configuration
+- **Dashboard**: Real-time server statistics and status
+- **User Management**: View, message, and disconnect users
+- **Channel Management**: Create, edit, and delete channels
+- **Operator Management**: Configure IRCops with granular permissions
+- **Ban Management**: K-lines, G-lines, Z-lines with expiration
+- **Configuration Editor**: Server settings, rate limits, IRCv3 capabilities
+
+👉 **[Admin Panel Documentation](docs/ADMIN_PANEL.md)** — detailed setup and usage guide.
 
 ## 📚 Related Projects
 
@@ -39,6 +54,21 @@ dotnet build
 
 # Run the server (development mode)
 dotnet run --project src/Hugin.Server
+```
+
+### Windows: Configuration Script
+
+Use the included PowerShell script for easy first-time setup:
+
+```powershell
+# Run the configuration script (builds, starts server, opens admin panel)
+.\configure-server.ps1
+
+# Skip build if already built
+.\configure-server.ps1 -NoBuild
+
+# Use custom admin port
+.\configure-server.ps1 -AdminPort 8443
 ```
 
 ## ⚙️ Configuration
@@ -114,6 +144,40 @@ tests/
 | WHOX | ✅ | Extended WHO queries |
 | WebSocket | ✅ | Browser-based IRC connections |
 
+## 🔌 Extensibility
+
+Hugin supports three ways to extend functionality:
+
+| System | Format | Use Case |
+|--------|--------|----------|
+| **Lua Scripts** | `.lua` files | Event handlers, custom commands, timers |
+| **JSON Triggers** | `.json` files | Automated responses, moderation rules |
+| **C# Plugins** | DLL assemblies | Full API access, complex integrations |
+
+### Lua Scripts
+```lua
+-- scripts/welcome.lua
+function on_join(event)
+    irc:SendNotice(event.nick, "Welcome to " .. event.channel .. "!")
+    return true
+end
+```
+
+### JSON Triggers
+```json
+{
+  "id": "hello-cmd",
+  "events": ["Message"],
+  "conditions": [{ "type": "Command", "pattern": "hello" }],
+  "actions": [{ "type": "Reply", "message": "Hello, {nick}!" }]
+}
+```
+
+### C# Plugins
+Create a `plugin.json` manifest and implement `IPlugin` for full server API access.
+
+See [docs/EXTENSIBILITY.md](docs/EXTENSIBILITY.md) for complete documentation.
+
 ## 🔒 Security
 
 - All connections must use TLS (plaintext is disabled by default)
@@ -133,7 +197,7 @@ dotnet test
 dotnet test --collect:"XPlat Code Coverage"
 ```
 
-**Current Status**: 505 unit tests passing
+**Current Status**: 553 unit tests passing
 
 ## 📄 License
 

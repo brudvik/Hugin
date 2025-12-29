@@ -86,6 +86,11 @@ public sealed class ServiceMessageContext
     public IServicesManager Services { get; }
 
     /// <summary>
+    /// Gets whether the source user is an IRC operator.
+    /// </summary>
+    public bool IsOperator { get; }
+
+    /// <summary>
     /// Creates a new service message context.
     /// </summary>
     public ServiceMessageContext(
@@ -93,13 +98,15 @@ public sealed class ServiceMessageContext
         string sourceNick,
         string? sourceAccount,
         string message,
-        IServicesManager services)
+        IServicesManager services,
+        bool isOperator = false)
     {
         SourceUid = sourceUid;
         SourceNick = sourceNick;
         SourceAccount = sourceAccount;
         Message = message;
         Services = services;
+        IsOperator = isOperator;
 
         var parts = message.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         Command = parts.Length > 0 ? parts[0].ToUpperInvariant() : string.Empty;

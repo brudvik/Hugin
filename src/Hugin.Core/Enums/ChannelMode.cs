@@ -44,6 +44,21 @@ public enum ChannelMode
     /// <summary>Registered users only (+R).</summary>
     RegisteredOnly = 1 << 12,
 
+    /// <summary>Flood protection (+f).</summary>
+    FloodProtection = 1 << 13,
+
+    /// <summary>Join throttling (+j).</summary>
+    JoinThrottle = 1 << 14,
+
+    /// <summary>Redirect on full (+L).</summary>
+    RedirectOnFull = 1 << 15,
+
+    /// <summary>Forward on ban/invite-only (+F).</summary>
+    ForwardOnRestriction = 1 << 16,
+
+    /// <summary>Delayed join/auditorium mode (+D).</summary>
+    DelayedJoin = 1 << 17,
+
     // Type C modes (parameter when setting, no parameter when unsetting)
 
     /// <summary>Channel has a key/password (+k).</summary>

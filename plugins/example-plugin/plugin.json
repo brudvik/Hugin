@@ -1,0 +1,19 @@
+{
+  "id": "example-plugin",
+  "name": "Example Plugin",
+  "version": "1.0.0",
+  "author": "Hugin Team",
+  "description": "Example plugin demonstrating the Hugin plugin API",
+  "url": "https://github.com/hugin-irc/example-plugin",
+  "assembly": "ExamplePlugin.dll",
+  "entryPoint": "ExamplePlugin.Plugin",
+  "minServerVersion": "1.0.0",
+  "dependencies": [],
+  "permissions": [
+    "send_messages",
+    "read_messages",
+    "manage_users"
+  ],
+  "enabledByDefault": true,
+  "license": "MIT"
+}

@@ -1,0 +1,128 @@
+{
+  "triggers": [
+    {
+      "id": "welcome",
+      "name": "Welcome Message",
+      "description": "Sends a welcome notice to users joining a channel",
+      "enabled": true,
+      "priority": 100,
+      "events": ["Join"],
+      "conditions": [
+        {
+          "type": "Always",
+          "channel": "#help"
+        }
+      ],
+      "actions": [
+        {
+          "type": "Notice",
+          "target": "{nick}",
+          "message": "Welcome to {channel}! Type !help for assistance.",
+          "delay": 1000
+        }
+      ],
+      "cooldown": 0,
+      "stopOnMatch": false
+    },
+    {
+      "id": "badword-filter",
+      "name": "Bad Word Filter",
+      "description": "Blocks messages containing bad words",
+      "enabled": true,
+      "priority": 10,
+      "events": ["Message", "PrivateMessage"],
+      "conditions": [
+        {
+          "type": "Regex",
+          "pattern": "\\b(badword1|badword2|badword3)\\b",
+          "caseSensitive": false
+        }
+      ],
+      "actions": [
+        {
+          "type": "Block"
+        },
+        {
+          "type": "Notice",
+          "target": "{nick}",
+          "message": "Your message was blocked due to inappropriate content."
+        }
+      ],
+      "cooldown": 0,
+      "stopOnMatch": true
+    },
+    {
+      "id": "hello-command",
+      "name": "Hello Command",
+      "description": "Responds to !hello command",
+      "enabled": true,
+      "priority": 50,
+      "events": ["Message"],
+      "conditions": [
+        {
+          "type": "Command",
+          "pattern": "hello"
+        }
+      ],
+      "actions": [
+        {
+          "type": "Reply",
+          "target": "{channel}",
+          "message": "Hello, {nick}! Welcome to the channel."
+        }
+      ],
+      "cooldown": 5,
+      "cooldownScope": "User",
+      "stopOnMatch": false
+    },
+    {
+      "id": "flood-kick",
+      "name": "Flood Protection Kick",
+      "description": "Kicks users posting repeated messages",
+      "enabled": false,
+      "priority": 5,
+      "events": ["Message"],
+      "conditions": [
+        {
+          "type": "Regex",
+          "pattern": "(.+)\\1{5,}",
+          "caseSensitive": false
+        }
+      ],
+      "actions": [
+        {
+          "type": "Kick",
+          "reason": "Flooding is not allowed"
+        }
+      ],
+      "cooldown": 60,
+      "cooldownScope": "User",
+      "stopOnMatch": true
+    },
+    {
+      "id": "url-warning",
+      "name": "URL Warning",
+      "description": "Warns about URLs from unregistered users",
+      "enabled": true,
+      "priority": 20,
+      "events": ["Message"],
+      "conditions": [
+        {
+          "type": "Regex",
+          "pattern": "https?://\\S+",
+          "registered": false
+        }
+      ],
+      "actions": [
+        {
+          "type": "Notice",
+          "target": "{nick}",
+          "message": "Please register your nickname before posting links."
+        }
+      ],
+      "cooldown": 300,
+      "cooldownScope": "User",
+      "stopOnMatch": false
+    }
+  ]
+}

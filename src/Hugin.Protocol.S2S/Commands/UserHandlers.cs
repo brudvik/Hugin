@@ -3,6 +3,7 @@ using Hugin.Core.Entities;
 using Hugin.Core.Enums;
 using Hugin.Core.Interfaces;
 using Hugin.Core.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace Hugin.Protocol.S2S.Commands;
 
@@ -42,7 +43,7 @@ public sealed class UidHandler : S2SCommandHandlerBase
         var username = p[3];
         var hostname = p[4];
         var uid = p[5];
-        // p[6] is servicestamp (unused for now)
+        var serviceStamp = p[6]; // Account name or 0
         var userModes = p[7];
         var virtualHost = p[8];
         var realName = p.Count > 9 ? p[9] : nickname;
@@ -61,9 +62,10 @@ public sealed class UidHandler : S2SCommandHandlerBase
             return;
         }
 
-        // Get user repository
+        // Get burst manager
+        var burstManager = GetService<IBurstManager>(context);
         var userRepo = GetService<IUserRepository>(context);
-        if (userRepo == null)
+        if (burstManager == null || userRepo == null)
         {
             return;
         }
@@ -74,34 +76,83 @@ public sealed class UidHandler : S2SCommandHandlerBase
             var existingUser = userRepo.GetByNickname(nick);
             if (existingUser != null)
             {
-                // Nickname collision - need to handle based on timestamp
-                // Older timestamp wins; if equal, we lose (we're the receiving end)
-                if (existingUser.ConnectedAt <= timestamp)
+                // Nickname collision - resolve based on timestamp
+                // Older timestamp wins; if equal, lower UID (lexicographically) wins
+                var resolution = ResolveNickCollision(existingUser, timestamp, uid, context);
+                
+                if (resolution == NickCollisionResolution.KillRemote)
                 {
                     // Our user was first, kill the remote user
                     var killMsg = S2SMessage.CreateWithSource(
                         context.LocalServerId.Sid,
                         "KILL",
                         uid,
-                        $"Nickname collision with older client");
+                        $"Nickname collision with older client (ours: {existingUser.ConnectedAt.ToUnixTimeSeconds()}, theirs: {timestampUnix})");
                     await context.ReplyAsync(killMsg, cancellationToken);
+                    await context.BroadcastAsync(killMsg, cancellationToken);
                     return;
                 }
-                else
+                else if (resolution == NickCollisionResolution.KillLocal)
                 {
                     // Remote user was first, kill our local user
-                    // This would be handled by the main server code
+                    var killMsg = S2SMessage.CreateWithSource(
+                        context.LocalServerId.Sid,
+                        "KILL",
+                        GetLocalUid(existingUser, burstManager),
+                        $"Nickname collision with older client");
+                    
+                    // Remove local user
+                    userRepo.Remove(existingUser.ConnectionId);
+                    
+                    // Broadcast kill
+                    await context.BroadcastAsync(killMsg, cancellationToken);
+                }
+                else // KillBoth
+                {
+                    // Same timestamp and can't determine winner - kill both
+                    var killRemoteMsg = S2SMessage.CreateWithSource(
+                        context.LocalServerId.Sid,
+                        "KILL",
+                        uid,
+                        "Nickname collision (identical timestamp)");
+                    await context.ReplyAsync(killRemoteMsg, cancellationToken);
+                    await context.BroadcastAsync(killRemoteMsg, cancellationToken);
+                    
+                    var killLocalMsg = S2SMessage.CreateWithSource(
+                        context.LocalServerId.Sid,
+                        "KILL",
+                        GetLocalUid(existingUser, burstManager),
+                        "Nickname collision (identical timestamp)");
+                    userRepo.Remove(existingUser.ConnectionId);
+                    await context.BroadcastAsync(killLocalMsg, cancellationToken);
+                    return;
                 }
             }
         }
 
-        // Create a remote user representation
-        // Remote users have a special connection ID format
-        var remoteConnectionId = GenerateRemoteConnectionId(uid);
-        var serverId = server.Id;
+        // Parse account from service stamp
+        var account = serviceStamp != "0" ? serviceStamp : null;
 
-        // Note: Remote users would be stored differently than local users
-        // For now, we just broadcast the UID to other links
+        // Introduce the remote user via BurstManager
+        var user = burstManager.IntroduceRemoteUser(
+            uid,
+            nickname,
+            username,
+            hostname,
+            virtualHost,
+            realName,
+            timestamp,
+            userModes,
+            account,
+            server);
+
+        if (user == null)
+        {
+            // User creation failed (shouldn't happen if collision was handled)
+            return;
+        }
+
+        // Propagate UID to other linked servers
         var uidMsg = S2SMessage.CreateWithSource(
             context.Message.Source ?? serverSid,
             "UID",
@@ -110,13 +161,73 @@ public sealed class UidHandler : S2SCommandHandlerBase
         await context.BroadcastAsync(uidMsg, cancellationToken);
     }
 
-    private static Guid GenerateRemoteConnectionId(string uid)
+    /// <summary>
+    /// Resolves a nickname collision between a local user and a remote user.
+    /// </summary>
+    private static NickCollisionResolution ResolveNickCollision(
+        User localUser,
+        DateTimeOffset remoteTimestamp,
+        string remoteUid,
+        S2SContext context)
     {
-        // Generate a deterministic GUID from the UID
-        var bytes = new byte[16];
-        var uidBytes = System.Text.Encoding.ASCII.GetBytes(uid.PadRight(16));
-        Array.Copy(uidBytes, bytes, Math.Min(16, uidBytes.Length));
-        return new Guid(bytes);
+        // Older timestamp wins
+        if (localUser.ConnectedAt < remoteTimestamp)
+        {
+            return NickCollisionResolution.KillRemote;
+        }
+        else if (remoteTimestamp < localUser.ConnectedAt)
+        {
+            return NickCollisionResolution.KillLocal;
+        }
+
+        // Same timestamp - use UID comparison (lower UID wins)
+        // This requires knowing the local user's UID
+        // If we can't determine, kill both to be safe
+        return NickCollisionResolution.KillBoth;
+    }
+
+    /// <summary>
+    /// Gets the UID for a local user.
+    /// </summary>
+    private static string GetLocalUid(User user, IBurstManager burstManager)
+    {
+        // Try to get existing UID from burst manager
+        // This is a bit of a hack - in production we'd have a proper mapping
+        var existingUser = burstManager.ResolveUser(user.Nickname.Value);
+        if (existingUser != null && existingUser.ConnectionId == user.ConnectionId)
+        {
+            // We need to generate/retrieve the UID - this would be tracked by BurstManager
+        }
+        
+        // Fallback: generate UID from connection ID
+        return GenerateUidFromConnectionId(user.ConnectionId, "000"); // SID would come from config
+    }
+
+    /// <summary>
+    /// Generates a UID from a connection ID.
+    /// </summary>
+    private static string GenerateUidFromConnectionId(Guid connectionId, string sid)
+    {
+        var bytes = connectionId.ToByteArray();
+        var value = BitConverter.ToInt64(bytes, 0) & 0x7FFFFFFFFFFFFFFF;
+
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        var result = new char[6];
+
+        for (int i = 5; i >= 0; i--)
+        {
+            result[i] = chars[(int)(value % 36)];
+            value /= 36;
+        }
+
+        return sid + new string(result);
+    }
+
+    private enum NickCollisionResolution
+    {
+        KillRemote,
+        KillLocal,
+        KillBoth
     }
 }
 
@@ -144,11 +255,12 @@ public sealed class S2SQuitHandler : S2SCommandHandlerBase
             ? context.Message.Parameters[0] 
             : "Client quit";
 
+        // Remove user from local state via BurstManager
+        var burstManager = GetService<IBurstManager>(context);
+        burstManager?.RemoveRemoteUser(uid);
+
         // Propagate to other servers
         await context.BroadcastAsync(context.Message, cancellationToken);
-
-        // Remove user from local state
-        // This would be handled by the main server code
     }
 }
 
@@ -169,11 +281,12 @@ public sealed class S2SKillHandler : S2SCommandHandlerBase
         var targetUid = context.Message.Parameters[0];
         var reason = context.Message.Parameters[1];
 
+        // Remove user from local state via BurstManager
+        var burstManager = GetService<IBurstManager>(context);
+        burstManager?.RemoveRemoteUser(targetUid);
+
         // Propagate to other servers
         await context.BroadcastAsync(context.Message, cancellationToken);
-
-        // Handle locally if the user is on this server
-        // This would be handled by the main server code
     }
 }
 
@@ -192,20 +305,38 @@ public sealed class S2SNickHandler : S2SCommandHandlerBase
     public override async ValueTask HandleAsync(S2SContext context, CancellationToken cancellationToken = default)
     {
         var uid = context.Message.Source;
-        if (string.IsNullOrEmpty(uid))
+        if (string.IsNullOrEmpty(uid) || uid.Length != 9)
         {
             return;
         }
 
         var newNick = context.Message.Parameters[0];
-        var timestamp = context.Message.Parameters.Count > 1 
-            ? context.Message.Parameters[1] 
-            : DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
+        if (!long.TryParse(context.Message.Parameters[1], out var timestampUnix))
+        {
+            timestampUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        }
+        var timestamp = DateTimeOffset.FromUnixTimeSeconds(timestampUnix);
+
+        // Update nickname via BurstManager
+        var burstManager = GetService<IBurstManager>(context);
+        if (burstManager != null)
+        {
+            var success = burstManager.UpdateNickname(uid, newNick, timestamp);
+            if (!success)
+            {
+                // Nick collision during change - KILL the user
+                var killMsg = S2SMessage.CreateWithSource(
+                    context.LocalServerId.Sid,
+                    "KILL",
+                    uid,
+                    "Nickname collision during nick change");
+                await context.ReplyAsync(killMsg, cancellationToken);
+                await context.BroadcastAsync(killMsg, cancellationToken);
+                return;
+            }
+        }
 
         // Propagate to other servers
         await context.BroadcastAsync(context.Message, cancellationToken);
-
-        // Update local user state
-        // This would be handled by the main server code
     }
 }

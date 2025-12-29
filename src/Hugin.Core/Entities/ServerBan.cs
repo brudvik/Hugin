@@ -23,6 +23,11 @@ public sealed class ServerBan
     public string Pattern { get; }
 
     /// <summary>
+    /// Gets the mask (alias for Pattern for compatibility).
+    /// </summary>
+    public string Mask => Pattern;
+
+    /// <summary>
     /// Gets the reason for the ban.
     /// </summary>
     public string Reason { get; }
@@ -69,6 +74,26 @@ public sealed class ServerBan
         SetBy = setBy;
         CreatedAt = DateTimeOffset.UtcNow;
         ExpiresAt = duration.HasValue ? CreatedAt + duration.Value : null;
+    }
+
+    /// <summary>
+    /// Creates a new server ban with explicit timestamps.
+    /// </summary>
+    public ServerBan(
+        BanType type,
+        string pattern,
+        string reason,
+        string setBy,
+        DateTimeOffset createdAt,
+        DateTimeOffset? expiresAt)
+    {
+        Id = Guid.NewGuid();
+        Type = type;
+        Pattern = pattern;
+        Reason = reason;
+        SetBy = setBy;
+        CreatedAt = createdAt;
+        ExpiresAt = expiresAt;
     }
 
     /// <summary>
@@ -149,5 +174,10 @@ public enum BanType
     /// <summary>
     /// Z-Line: Ban by IP address or CIDR range.
     /// </summary>
-    ZLine
+    ZLine,
+
+    /// <summary>
+    /// Jupe: Blocks a server name from linking.
+    /// </summary>
+    Jupe
 }

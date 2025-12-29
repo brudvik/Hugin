@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Hugin.Protocol</RootNamespace>
+    <AssemblyName>Hugin.Protocol</AssemblyName>
+    <Description>IRC protocol implementation for Hugin IRC Server</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hugin.Core\Hugin.Core.csproj" />
+    <ProjectReference Include="..\Hugin.Security\Hugin.Security.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+</Project>

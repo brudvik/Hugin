@@ -1,0 +1,35 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <LangVersion>latest</LangVersion>
+    
+    <!-- Assembly info -->
+    <Company>Hugin IRC Project</Company>
+    <Product>Hugin IRC Server</Product>
+    <Copyright>Copyright © 2024-2025 Hugin IRC Project. Licensed under MIT.</Copyright>
+    <Version>0.1.0</Version>
+    <Authors>Hugin Contributors</Authors>
+    
+    <!-- Security settings -->
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    
+    <!-- 
+      Suppress CA1848: Use LoggerMessage delegates for performance
+      This is a performance optimization, not a correctness issue.
+      We may implement high-performance logging later.
+    -->
+    <NoWarn>$(NoWarn);CA1848</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <!-- Using SDK built-in analyzers instead of NuGet package to avoid version conflicts -->
+</Project>

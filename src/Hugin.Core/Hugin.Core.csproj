@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Hugin.Core</RootNamespace>
+    <AssemblyName>Hugin.Core</AssemblyName>
+    <Description>Core domain entities and interfaces for Hugin IRC Server</Description>
+  </PropertyGroup>
+
+</Project>

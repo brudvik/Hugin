@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Hugin.Network</RootNamespace>
+    <AssemblyName>Hugin.Network</AssemblyName>
+    <Description>Network layer for Hugin IRC Server including TCP and WebSocket listeners</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hugin.Core\Hugin.Core.csproj" />
+    <ProjectReference Include="..\Hugin.Protocol\Hugin.Protocol.csproj" />
+    <ProjectReference Include="..\Hugin.Protocol.S2S\Hugin.Protocol.S2S.csproj" />
+    <ProjectReference Include="..\Hugin.Security\Hugin.Security.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.IO.Pipelines" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+
+</Project>

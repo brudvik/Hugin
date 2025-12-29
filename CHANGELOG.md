@@ -1,0 +1,258 @@
+# Changelog
+
+All notable changes to Hugin IRC Server will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+- **WebSocket Support**: Browser-based IRC connections
+  - WebSocketConnection: Wraps WebSocket as IClientConnection
+  - WebSocketListener: HTTP upgrade with CORS origin validation
+  - Rate limiting integration via TryConsumeConnection
+- **Prometheus Metrics**: Server observability endpoint
+  - MetricsCollector: Counter, Gauge, Histogram with labels
+  - IrcMetrics: Pre-defined IRC server metrics (connections, users, channels, messages)
+  - MetricsServer: HTTP /metrics endpoint with IP allowlist
+  - Text format 0.0.4 compatible with Prometheus scraping
+- **WHOX Extended WHO**: Enhanced WHO command with field selection
+  - WHO <mask> %<fields>[,<querytype>] format support
+  - RPL_WHOSPCRPL (354) numeric for extended responses
+  - Configurable fields: t (type), c (channel), u (user), i (IP), h (host),
+    s (server), n (nick), f (flags), d (hopcount), l (idle), a (account), r (realname)
+  - WhoxRequest parser for field specification
+- **SCRAM-SHA-256 SASL**: Implemented SCRAM-SHA-256 authentication mechanism
+  - Two-step challenge-response authentication with HMAC-SHA256
+  - ServerKey and StoredKey derivation for secure password verification
+  - Extended SaslContext with State dictionary for multi-step mechanisms
+- **MONITOR Handler**: IRCv3 MONITOR command for online status tracking
+  - Subcommands: + (add), - (remove), C (clear), L (list), S (status)
+  - Per-user HashSet with configurable limit (default 100)
+  - RPL_MONONLINE/RPL_MONOFFLINE/RPL_MONLIST/RPL_ENDOFMONLIST numerics
+- **TAGMSG Command**: IRCv3 message-tags only messages
+  - Supports typing indicators, reactions, and other tag-only messages
+  - Respects channel modes and capability requirements
+- **Channel Modes**: Extended channel mode support
+  - +C (NoCTCP): Block CTCP messages except ACTION
+  - +S (StripColors): Strip mIRC color/formatting codes from messages
+  - +c (NoColors): Block messages containing color codes
+  - +R (RegisteredOnly): Only registered users can join/speak
+  - MessageFilter utility class with Regex-based detection
+- **K-Line System**: Server-side ban management
+  - KLINE, UNKLINE, GLINE, ZLINE commands for operators
+  - Duration parsing (Nm, Nh, Nd, Nw formats)
+  - Pattern-based hostmask and IP matching
+  - ServerBan entity with expiration support
+- **SA* Operator Commands**: Service-style operator commands
+  - SAJOIN: Force user to join a channel (bypasses all restrictions)
+  - SAPART: Force user to leave a channel
+  - SANICK: Force user to change nickname
+  - SAMODE: Set channel/user modes as server
+- **WEBIRC Support**: Trusted proxy host spoofing
+  - WebircHandler for gateway authentication
+  - WebircValidator with CIDR range matching
+  - Constant-time password comparison
+  - Per-block cloaking configuration
+- **Network Layer (S2S)**: Complete Server-to-Server network implementation
+  - IS2SConnection interface for S2S connection abstraction
+  - S2SConnection with TLS support using System.IO.Pipelines
+  - S2SConnectionManager for managing active S2S connections
+  - S2SListener for accepting incoming S2S connections
+  - S2SConnector for outgoing S2S connections with retry logic
+  - S2SMessageDispatcher for routing messages to handlers
+  - S2SService hosted service for managing S2S lifecycle
+- **Persistence Layer (S2S)**: Server link persistence
+  - ServerLinkEntity for storing server link configurations
+  - ServerLinkClass enum (Leaf, Hub, Services)
+  - IServerLinkRepository interface for server link CRUD operations
+  - ServerLinkRepository implementation with Entity Framework Core
+  - HuginDbContext server_links table configuration
+- **Services Framework**: IRC network services (NickServ, ChanServ)
+  - INetworkService interface for service abstraction
+  - ServiceMessageContext for message handling context
+  - IServicesManager interface for managing services
+  - ServicesManager with automatic service registration
+  - NickServ: REGISTER, IDENTIFY, INFO, SET, DROP, GHOST commands
+  - ChanServ: REGISTER, INFO, OP, DEOP, VOICE, DEVOICE, KICK, BAN, UNBAN, TOPIC, SET, DROP
+- **Account Repository Enhancements**: Password and account management
+  - ValidatePasswordAsync for password verification
+  - UpdatePasswordAsync for password changes
+  - SetEmailAsync for email updates
+  - UpdateLastSeenAsync for login tracking
+- **Test Coverage**: Services tests (52 new tests, 500 total)
+  - NickServTests (27 tests) - registration, identification, info, settings
+  - ChanServTests (25 tests) - channel management commands
+
+### Security
+- **HostCloaker**: Replaced SHA-256 prefix construction with HMAC-SHA256 to prevent length-extension attacks
+- **Hostmask**: Added `RegexOptions.NonBacktracking` to wildcard matching to prevent ReDoS attacks
+- **PasswordHasher**: Added memory zeroing for password bytes after hashing
+- **ConfigurationEncryptor**: Added memory zeroing for plaintext bytes after encryption/decryption
+- **IrcServerService**: AUTHENTICATE command payloads are now redacted in trace logs
+- **TlsConfiguration**: Changed default minimum TLS version from 1.2 to 1.3 for improved security
+- **TlsConfiguration**: Added `AllowTls12Fallback` option for environments requiring TLS 1.2 support
+- **Startup Validation**: Added security warnings for default secrets (CloakSecret, database password)
+- **Startup Validation**: Added warning when using self-signed certificates
+
+- **Protocol Layer (S2S)**: Complete Server-to-Server protocol implementation
+  - S2SMessage class for parsing/serializing S2S protocol messages with IRCv3 tags
+  - IS2SCommandHandler interface and S2SContext for command handling
+  - S2SCommandHandlerBase for consistent handler implementation
+  - IServerLinkManager interface for managing server connections and routing
+  - ServerLinkManager with thread-safe ConcurrentDictionary storage and cascade removal
+  - IS2SHandshakeManager for PASS/CAPAB/SERVER handshake sequence
+  - S2SHandshakeManager implementation with full TS6-style handshake
+- **Protocol Layer (S2S Commands)**: Server handlers (SERVER, SQUIT, PING, PONG, ERROR)
+- **Protocol Layer (S2S Commands)**: User handlers (UID, QUIT, KILL, NICK)
+- **Protocol Layer (S2S Commands)**: Channel handlers (SJOIN, PART, KICK, TMODE, TOPIC)
+- **Protocol Layer (S2S Commands)**: Message handlers (PRIVMSG, NOTICE, ENCAP)
+- **Protocol Layer**: Client-facing server link handlers
+  - CONNECT initiates server links (operator only)
+  - LINKS lists connected servers
+  - TRACE shows route to user/server
+- **Core Layer**: TRACE-related numeric replies (200-209, 261-262)
+- **Protocol Layer**: IrcNumerics helper methods for Links() and Trace*()
+- **Test Coverage**: S2S protocol tests (38 new tests, 448 total)
+  - S2SMessageTests (17 tests) - parsing, serialization, tags
+  - ServerLinkManagerTests (13 tests) - link management, routing
+  - S2SHandshakeManagerTests (8 tests) - handshake state machine
+- **Protocol Layer**: CHATHISTORY handler (IRCv3 draft/chathistory)
+  - LATEST - Gets most recent messages
+  - BEFORE - Gets messages before a timestamp/msgid
+  - AFTER - Gets messages after a timestamp/msgid
+  - AROUND - Gets messages around a specific message
+  - BETWEEN - Gets messages between two points
+  - TARGETS - Lists conversation targets for an account
+  - Uses BATCH for message playback
+- **Protocol Layer**: IRCv3 Standard Replies (FAIL, WARN, NOTE)
+- **Protocol Layer**: Administrative handlers (REHASH, DIE, RESTART)
+  - REHASH reloads server configuration (382)
+  - DIE shuts down the server gracefully
+  - RESTART restarts the server gracefully
+- **Test Coverage**: Administrative handler tests (6 new tests, 410 total)
+- **Protocol Layer**: Operator handlers (WHOWAS, KILL, WALLOPS, STATS)
+  - WHOWAS returns historical user info (314, 312, 406, 369)
+  - KILL disconnects users (operator only)
+  - WALLOPS sends operator broadcast messages
+  - STATS returns server statistics (U=uptime, M=commands, O=o-lines, L=links)
+- **Test Coverage**: OperatorHandler tests (13 new tests, 404 total)
+- **Protocol Layer**: Server info handlers (VERSION, TIME, INFO, ADMIN)
+  - VERSION returns server version information (351)
+  - TIME returns server local time (391)
+  - INFO returns server description and features (371, 374)
+  - ADMIN returns administrative contact info (256-259)
+- **Protocol Layer**: Utility handlers (USERHOST, ISON)
+  - USERHOST returns quick user/host info for up to 5 nicknames (302)
+  - ISON checks if specified nicknames are online (303)
+- **Protocol Layer**: OPER handler for operator authentication
+  - Validates operator credentials
+  - Grants +o user mode on success (381)
+- **Protocol Layer**: SETNAME handler (IRCv3)
+  - Allows users to change their realname
+  - Broadcasts to shared channels with setname capability
+- **Test Coverage**: ServerInfoHandler tests (14 new tests, 391 total)
+- **Protocol Layer**: Query handlers (WHOIS, WHO, LIST, NAMES)
+  - WHOIS returns user info, channels, secure status, away, idle time (311-318 numerics)
+  - WHO lists channel members with status flags, supports mask matching
+  - LIST returns visible channels with member counts and topics
+  - NAMES returns channel member list with mode prefixes
+- **Protocol Layer**: Utility handlers (TOPIC, AWAY, INVITE, MOTD, LUSERS, PASS)
+  - TOPIC queries and sets channel topics with +t mode support
+  - AWAY sets/clears away status with away-notify capability broadcast
+  - INVITE invites users to channels with invite-notify support
+  - MOTD returns message of the day
+  - LUSERS returns server statistics (users, channels, operators)
+  - PASS handles pre-registration connection passwords
+- **Protocol Layer**: MODE handler for user and channel modes
+  - User modes: +i (invisible), +w (wallops), +s (server notices), +B (bot)
+  - Channel modes: +i (invite-only), +m (moderated), +n (no external), +s (secret), +t (topic protected)
+  - Channel settings: +k (key), +l (limit), +b (ban list)
+  - Member modes: +o (op), +v (voice), +h (halfop), +a (admin), +q (owner)
+- **Protocol Layer**: AUTHENTICATE handler for SASL authentication
+  - PLAIN mechanism with password verification
+  - EXTERNAL mechanism with certificate fingerprint
+  - Chunked data handling (400-byte chunks)
+- **Core Layer**: CapabilityManager convenience properties (HasSasl, HasInviteNotify, HasChghost, HasSetname)
+- **Core Layer**: CommandContext.SaslSession for SASL state tracking
+- **Test Coverage**: Handler tests for new commands (47 new tests total)
+- **Build Scripts**: PowerShell scripts for development workflow
+  - `scripts/run.ps1` - Start the IRC server with environment configuration
+  - `scripts/build.ps1` - Build solution with clean, restore, and test options
+  - `scripts/release.ps1` - Create versioned release packages with auto-increment
+- **Application Icon**: Added hugin-irc-server.ico as application icon for Windows
+- **Documentation**: RFC_COMPLIANCE.md - Comprehensive RFC 1459/2812 and IRCv3 compliance report
+- **Documentation**: SECURITY_EVALUATION.md - Full security audit report
+- **Test Coverage**: Command handler tests (NickHandler, UserHandler, PingHandler, PongHandler, QuitHandler, PrivmsgHandler, NoticeHandler, JoinHandler)
+- **Test Coverage**: SASL mechanism tests (PlainMechanism, ExternalMechanism, SaslManager)
+- **Test Coverage**: Network layer tests (ConnectionManager, MessageBroker)
+- **Test Coverage**: Persistence repository tests (InMemoryUserRepository, InMemoryChannelRepository)
+- **Test Project**: Hugin.Network.Tests project for network layer unit tests
+- Initial project structure with Clean Architecture
+- **Core Layer**: Domain entities (User, Channel, Account, StoredMessage, LinkedServer)
+- **Core Layer**: Value objects (Nickname, ChannelName, Hostmask, ServerId)
+- **Core Layer**: Enums (NumericReply, UserMode, ChannelMode, RegistrationState)
+- **Core Layer**: Repository interfaces (IUserRepository, IChannelRepository, IAccountRepository, IMessageRepository)
+- **Core Layer**: Service interfaces (IMessageBroker, IConnectionManager, IMessageIdGenerator)
+- **Protocol Layer**: IRC message parser following IRCv3 message format
+- **Protocol Layer**: IrcNumerics helper for generating numeric replies
+- **Protocol Layer**: CapabilityManager for IRCv3 CAP negotiation
+- **Protocol Layer**: Batch handling for grouped messages
+- **Protocol Layer**: Command handler infrastructure with CommandHandlerBase
+- **Protocol Layer**: Registration handlers (NICK, USER, QUIT, PING, PONG)
+- **Protocol Layer**: Channel handlers (JOIN, PART, KICK)
+- **Protocol Layer**: Message handlers (PRIVMSG, NOTICE)
+- **Protocol Layer**: CAP handler for capability negotiation
+- **Security Layer**: PasswordHasher using Argon2id (static methods)
+- **Security Layer**: ConfigurationEncryptor using AES-256-GCM
+- **Security Layer**: TlsConfiguration for TLS 1.2/1.3
+- **Security Layer**: SASL mechanisms (PLAIN, EXTERNAL)
+- **Security Layer**: RateLimiter with token bucket algorithm (implements IDisposable)
+- **Security Layer**: HostCloaker for privacy protection
+- **Security Layer**: CertificateFingerprint for client cert authentication
+- **Persistence Layer**: HuginDbContext with Entity Framework Core
+- **Persistence Layer**: AccountRepository and MessageRepository
+- **Persistence Layer**: In-memory repositories for users and channels
+- **Network Layer**: ClientConnection using System.IO.Pipelines
+- **Network Layer**: TcpListener for incoming connections
+- **Network Layer**: ConnectionManager for tracking active connections
+- **Network Layer**: MessageBroker for message distribution
+- **Server Layer**: HuginConfiguration for server settings
+- **Server Layer**: IrcServerService as hosted service
+- **Server Layer**: Complete DI configuration in Program.cs
+- Comprehensive unit tests for Core, Protocol, and Security layers (344 tests passing)
+- Central Package Management with Directory.Packages.props
+- GitHub Copilot instructions for development guidelines
+
+### Changed
+- Use PascalCase for test method names (no underscores) to comply with CA1707
+- Use `context` and `cancellationToken` parameter names consistently (CA1725)
+- PasswordHasher methods are now static for better performance
+- RateLimiter now properly implements IDisposable (CA1001)
+- Use CultureInfo.InvariantCulture for string formatting (CA1305)
+- Suppress CA1848 (LoggerMessage) globally - performance optimization for later
+- Suppress CA1304/CA1311/CA1862 in EF Core LINQ queries (translated to SQL)
+
+### Security
+- TLS 1.2/1.3 mandatory for all connections
+- Argon2id password hashing with secure defaults
+- AES-256-GCM configuration encryption
+- Rate limiting to prevent abuse
+- **Fixed**: Certificate fingerprint comparison now uses constant-time algorithm to prevent timing attacks
+- Hostname cloaking enabled by default
+
+## [0.1.0] - TBD
+
+Initial release planned with:
+- Basic IRC server functionality
+- User registration and authentication
+- Channel operations
+- Private messaging
+- PostgreSQL persistence
+- TLS encryption
+
+---
+
+[Unreleased]: https://github.com/yourusername/hugin/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/yourusername/hugin/releases/tag/v0.1.0

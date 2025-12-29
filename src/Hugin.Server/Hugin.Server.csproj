@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Hugin.Server</RootNamespace>
+    <AssemblyName>Hugin.Server</AssemblyName>
+    <Description>Hugin IRC Server - Console application and Windows Service host</Description>
+    
+    <!-- Application icon -->
+    <ApplicationIcon>..\..\resources\hugin-irc-server.ico</ApplicationIcon>
+    
+    <!-- Windows Service support -->
+    <RuntimeIdentifiers>win-x64;linux-x64;osx-x64</RuntimeIdentifiers>
+    
+    <!-- Single file publish settings -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <!-- Embed icon as Win32 resource -->
+  <ItemGroup>
+    <Content Include="..\..\resources\hugin-irc-server.ico">
+      <Link>hugin-irc-server.ico</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hugin.Core\Hugin.Core.csproj" />
+    <ProjectReference Include="..\Hugin.Protocol\Hugin.Protocol.csproj" />
+    <ProjectReference Include="..\Hugin.Protocol.S2S\Hugin.Protocol.S2S.csproj" />
+    <ProjectReference Include="..\Hugin.Security\Hugin.Security.csproj" />
+    <ProjectReference Include="..\Hugin.Persistence\Hugin.Persistence.csproj" />
+    <ProjectReference Include="..\Hugin.Network\Hugin.Network.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

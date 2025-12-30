@@ -8,6 +8,108 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **MemoServ Offline Messaging**: Complete memo/offline message service between registered users
+  - `Memo` domain entity with sender, recipient, text, timestamps, and read status
+  - `IMemoRepository` interface with full EF Core implementation in `MemoRepository`
+  - SEND command: Send offline messages to registered users (max 1000 chars)
+  - LIST command: View all memos with preview and time ago formatting
+  - READ command: View full memo content and mark as read
+  - DELETE/DEL command: Remove individual memos
+  - CLEAR command: Delete all memos in inbox
+  - Comprehensive unit tests for MemoServ commands and MemoRepository
+- **OperServ Network Administration**: Enhanced operator commands for network-wide management
+  - AKILL command: Network-wide autokills (G-lines) with duration support (30m, 2h, 1d, permanent)
+  - JUPE command: Block server names from linking to network for maintenance/security
+  - RESTART command: Restart IRC server with CONFIRM protection
+  - DIE command: Shut down IRC server with CONFIRM protection
+  - STATS command: Display network statistics and server links
+  - Comprehensive help system for all OperServ commands
+- **BotServ Bot Hosting**: Complete bot assignment and management service for channels
+  - `Bot` and `ChannelBot` entities with full EF Core persistence
+  - `IBotRepository` and `IChannelBotRepository` interfaces with implementations
+  - BOTLIST command: List available bots for channel assignment
+  - ASSIGN command: Assign bots to registered channels (founder access required)
+  - UNASSIGN command: Remove bots from channels
+  - SAY command: Make bot send messages to channel
+  - ACT command: Make bot perform CTCP ACTION in channel
+  - INFO command: View bot assignments and configuration for channel
+  - SET command: Configure bot settings (greet messages, auto-greet)
+  - Comprehensive unit tests for BotServ service and repositories
+- **HostServ Virtual Hosts**: Vhost request and approval workflow for user privacy
+  - `VirtualHost` domain entity with hostname validation and activation state
+  - `IVirtualHostRepository` EF Core implementation with pending/active lookups
+  - REQUEST command: Users submit vhost requests (validated for hostname rules)
+  - APPROVE/REJECT commands: IRC operators review pending vhosts
+  - ACTIVATE/OFF commands: Users enable or disable their approved vhost
+  - DELETE command: Remove a specific vhost entry
+  - LIST/WAITING commands: Users list their vhosts; operators list pending requests
+  - Comprehensive unit and integration tests for HostServ and VirtualHostRepository
+- **OperServ Coverage & Docs**: Added unit tests and expanded documentation for operator commands (AKILL, JUPE, STATS, MODE, KICK, KILL, RAW, GLOBAL, RESTART/DIE)
+- **ChanServ Database Integration**: Full persistence for channel registration
+  - `RegisteredChannel` domain entity with founder, topic, modes, keeptopic, secure settings
+  - `IRegisteredChannelRepository` interface with EF Core implementation
+  - REGISTER command now persists to PostgreSQL database
+  - DROP command removes channel from database with founder/operator verification
+  - INFO command retrieves full registration details from database
+  - SET command supports FOUNDER, SUCCESSOR, KEEPTOPIC, and SECURE options
+- **ChanServ Channel Operations**: Functional channel management commands
+  - VOICE/DEVOICE: Apply +v/-v modes via IRC protocol
+  - OP/DEOP: Apply +o/-o modes via IRC protocol
+  - KICK: Remove users from channels with reason
+  - BAN/UNBAN: Set +b/-b modes with automatic hostmask generation
+  - TOPIC: Set channel topics with database sync for KEEPTOPIC
+- **Server Ban Persistence**: K-lines, G-lines, Z-lines now survive server restarts
+  - `PersistedServerBanRepository`: Hybrid cache + database storage
+  - Bans loaded from PostgreSQL on startup, changes persisted immediately
+  - `server_bans` table with pattern, reason, expiry, and setter tracking
+- **SignalR User Event Notifications**: Real-time admin panel updates
+  - `IUserEventNotifier` interface in Core for layer abstraction
+  - `SignalRUserEventNotifier` bridges to `IAdminHubService`
+  - Events for: Connected, Disconnected, NickChange, Join, Part
+  - Automatic notification on registration complete, quit, nick change, join, part
+
+### Added
+- **Metrics Integration**: Complete metrics system with real-time tracking
+  - `IrcMetrics`: Sliding window rate calculation for messages/second and bytes/second
+  - `MetricsCollector`: Prometheus-compatible metrics collection singleton
+  - `StatsBackgroundService`: Uses `IrcMetrics` for accurate real-time statistics
+  - `IrcServerService`: Tracks message rates via `IrcMetrics.MessageReceived()`
+- **Let's Encrypt Support**: ACME certificate automation via Certes library
+  - `SetupController.RequestLetsEncryptCertificateAsync`: Full ACME flow for automatic TLS certificates
+  - HTTP-01 challenge validation with file-based response
+  - Staging environment support for testing
+- **ChanServ Enhancements**: Complete channel services implementation
+  - `REGISTER`: Now verifies user has channel operator status before registration
+  - `OP`: Full permission checks and MODE +o broadcast to channel
+  - `DROP`: Verifies channel founder/owner or IRC operator privileges
+- **Channel Registration in Admin Panel**: API support for registered channels
+  - `ChannelsController`: Looks up `ChannelRegistrationEntity` from database
+  - `ChannelDto.IsRegistered` and `ChannelDto.Founder` populated from database
+  - Efficient batch lookup for channel listing
+- **Ban Enforcement**: K-line implementation with user disconnection
+  - `KlineHandler`: Disconnects all matching users when K-line is set
+  - Wildcard-to-regex conversion for nick!user@host pattern matching
+  - Sends KILL message with reason before disconnecting
+- **S2S Routing**: Server-to-server message routing in ConnectionManager
+  - `SendToServerAsync`: Routes messages via `IS2SConnectionManager`
+  - Supports both SID and server name for target identification
+  - `SendToOperatorsAsync`: Filters by actual operator status from `IUserRepository`
+
+### Fixed
+- **Channel JOIN messages not reaching joining user**: Fixed critical bug where users would not receive their own JOIN message and subsequent channel messages. The `MessageBroker.SendToChannelAsync` method now uses `IChannelRepository` to look up channel members from the authoritative `Channel.Members` collection instead of a separate (and unsynchronized) connection tracking dictionary in `ConnectionManager`. This ensures IRC clients like mIRC properly display channels after joining.
+- **CAP negotiation breaking automatic registration**: Fixed bug where IRC clients using IRCv3 capability negotiation (like mIRC) would hang after connecting. The `CAP END` handler now correctly checks if NICK and USER were received during negotiation and sets the appropriate registration state to allow registration to complete.
+- **Line parsing error with multi-segment buffers**: Fixed `ArgumentOutOfRangeException` in `ClientConnection.TryReadLine` when reading IRC lines that span multiple buffer segments. Now uses `PositionOf` and proper sequence slicing instead of `SequenceReader.TryReadTo`.
+- **Database migration check**: `SetupController.TestDatabaseConnectionAsync` now checks `__EFMigrationsHistory` table instead of just table count
+
+### Changed
+- **JsonSerializerOptions caching**: All JSON serialization now uses cached `JsonSerializerOptions` instances to avoid CA1869 warnings and improve performance
+  - `JwtJsonOptions`: Cached options for admin user serialization
+  - `ConfigJsonOptions`: Cached options for configuration file serialization  
+  - `OperatorJsonOptions`: Cached options for operator config serialization
+- **Culture-invariant string operations**: All string comparisons now use `StringComparison.OrdinalIgnoreCase` or `ToUpperInvariant()` to avoid culture-dependent behavior (CA1304/CA1311/CA1862)
+- **Null-safe S2S routing**: `ConnectionManager.SendToServerAsync` now uses null-conditional operators for `RemoteServerId` access
+
+### Added
 - **Web-based Admin Panel**: Modern Angular/Bootstrap admin interface
   - Setup wizard for initial server configuration (5 steps)
   - Dashboard with real-time server statistics and status

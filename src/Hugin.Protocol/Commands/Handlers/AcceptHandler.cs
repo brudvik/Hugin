@@ -16,10 +16,17 @@ public sealed class AcceptHandler : CommandHandlerBase
     private readonly IAcceptListManager? _acceptManager;
 
     /// <summary>
+    /// Creates a new ACCEPT handler with default settings.
+    /// </summary>
+    public AcceptHandler() : this(null)
+    {
+    }
+
+    /// <summary>
     /// Creates a new ACCEPT handler.
     /// </summary>
     /// <param name="acceptManager">Optional accept list manager.</param>
-    public AcceptHandler(IAcceptListManager? acceptManager = null)
+    public AcceptHandler(IAcceptListManager? acceptManager)
     {
         _acceptManager = acceptManager;
     }

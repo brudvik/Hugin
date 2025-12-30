@@ -2,8 +2,11 @@
 // Copyright (c) 2024 Hugin Contributors
 // Licensed under the MIT License
 
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Certes;
+using Certes.Acme;
 using Hugin.Server.Api.Auth;
 using Hugin.Server.Api.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -487,12 +490,7 @@ public sealed class SetupService : ISetupService
                 };
 
             case TlsSetupMethod.LetsEncrypt:
-                // TODO: Implement Let's Encrypt integration
-                return new TlsSetupResultDto 
-                { 
-                    Success = false, 
-                    Error = "Let's Encrypt integration is not yet implemented" 
-                };
+                return await RequestLetsEncryptCertificateAsync(request, cancellationToken);
 
             case TlsSetupMethod.Skip:
                 _tlsConfigured = true;
@@ -532,15 +530,30 @@ public sealed class SetupService : ISetupService
             await connection.OpenAsync(cancellationToken);
 
             // Get PostgreSQL version
-            await using var cmd = new NpgsqlCommand("SELECT version()", connection);
-            var version = await cmd.ExecuteScalarAsync(cancellationToken) as string;
+            await using var versionCmd = new NpgsqlCommand("SELECT version()", connection);
+            var version = await versionCmd.ExecuteScalarAsync(cancellationToken) as string;
+
+            // Check if __EFMigrationsHistory table exists and has any migrations
+            var needsMigration = true;
+            try
+            {
+                await using var migrationCmd = new NpgsqlCommand(
+                    "SELECT COUNT(*) FROM \"__EFMigrationsHistory\"", connection);
+                var migrationCount = Convert.ToInt32(await migrationCmd.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture);
+                needsMigration = migrationCount == 0;
+            }
+            catch (PostgresException ex) when (ex.SqlState == "42P01") // Table doesn't exist
+            {
+                // No migrations table means migrations are needed
+                needsMigration = true;
+            }
 
             return new DatabaseTestResultDto
             {
                 Success = true,
                 PostgresVersion = version,
                 DatabaseExists = true,
-                NeedsMigration = true // TODO: Check if migrations are needed
+                NeedsMigration = needsMigration
             };
         }
         catch (PostgresException ex) when (ex.SqlState == "3D000") // Database does not exist
@@ -629,6 +642,172 @@ public sealed class SetupService : ISetupService
     {
         WriteIndented = true
     };
+
+    /// <summary>
+    /// Requests a Let's Encrypt certificate using the ACME protocol.
+    /// </summary>
+    /// <param name="request">TLS setup request with domain and email.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Result of the certificate request.</returns>
+    private async Task<TlsSetupResultDto> RequestLetsEncryptCertificateAsync(SetupTlsRequest request, CancellationToken cancellationToken)
+    {
+        var domain = request.LetsEncryptDomain ?? _serverConfig?.ServerName;
+        var email = request.LetsEncryptEmail ?? _serverConfig?.AdminEmail;
+
+        if (string.IsNullOrWhiteSpace(domain))
+        {
+            return new TlsSetupResultDto
+            {
+                Success = false,
+                Error = "Domain name is required for Let's Encrypt certificates"
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return new TlsSetupResultDto
+            {
+                Success = false,
+                Error = "Email address is required for Let's Encrypt certificates"
+            };
+        }
+
+        try
+        {
+            _logger.LogInformation("Requesting Let's Encrypt certificate for {Domain}", domain);
+
+            // Use staging for testing, production for real certificates
+            var acmeServer = request.LetsEncryptStaging 
+                ? WellKnownServers.LetsEncryptStagingV2 
+                : WellKnownServers.LetsEncryptV2;
+
+            // Create or load existing ACME account
+            var accountKeyPath = Path.Combine(AppContext.BaseDirectory, "acme-account.pem");
+            AcmeContext acme;
+
+            if (File.Exists(accountKeyPath))
+            {
+                var accountKeyPem = await File.ReadAllTextAsync(accountKeyPath, cancellationToken);
+                var accountKey = KeyFactory.FromPem(accountKeyPem);
+                acme = new AcmeContext(acmeServer, accountKey);
+                await acme.Account();
+            }
+            else
+            {
+                acme = new AcmeContext(acmeServer);
+                await acme.NewAccount(email, termsOfServiceAgreed: true);
+                
+                // Save account key for future use
+                var accountPem = acme.AccountKey.ToPem();
+                await File.WriteAllTextAsync(accountKeyPath, accountPem, cancellationToken);
+            }
+
+            // Create certificate order
+            var order = await acme.NewOrder(new[] { domain });
+
+            // Get authorization challenges
+            var authz = (await order.Authorizations()).First();
+            var httpChallenge = await authz.Http();
+
+            if (httpChallenge == null)
+            {
+                return new TlsSetupResultDto
+                {
+                    Success = false,
+                    Error = "HTTP challenge not available. Ensure your server is accessible on port 80.",
+                    Warning = $"You need to serve the token at: http://{domain}/.well-known/acme-challenge/{httpChallenge?.Token}"
+                };
+            }
+
+            // Save challenge token for HTTP validation
+            var challengePath = Path.Combine(AppContext.BaseDirectory, "wwwroot", ".well-known", "acme-challenge");
+            Directory.CreateDirectory(challengePath);
+            var tokenPath = Path.Combine(challengePath, httpChallenge.Token);
+            await File.WriteAllTextAsync(tokenPath, httpChallenge.KeyAuthz, cancellationToken);
+
+            _logger.LogInformation("ACME challenge token saved. Validating domain ownership...");
+
+            // Validate the challenge
+            var challengeResult = await httpChallenge.Validate();
+
+            // Wait for validation (with timeout)
+            var timeout = DateTime.UtcNow.AddMinutes(2);
+            while (challengeResult.Status == Certes.Acme.Resource.ChallengeStatus.Pending && DateTime.UtcNow < timeout)
+            {
+                await Task.Delay(2000, cancellationToken);
+                challengeResult = await httpChallenge.Resource();
+            }
+
+            // Clean up challenge file
+            try { File.Delete(tokenPath); } catch { /* ignore */ }
+
+            if (challengeResult.Status != Certes.Acme.Resource.ChallengeStatus.Valid)
+            {
+                return new TlsSetupResultDto
+                {
+                    Success = false,
+                    Error = $"Domain validation failed: {challengeResult.Error?.Detail ?? "Unknown error"}. " +
+                            $"Ensure http://{domain}/.well-known/acme-challenge/ is accessible from the internet."
+                };
+            }
+
+            _logger.LogInformation("Domain validated. Generating certificate...");
+
+            // Generate private key and finalize the order
+            var privateKey = KeyFactory.NewKey(KeyAlgorithm.RS256);
+            await order.Finalize(new CsrInfo
+            {
+                CountryName = "NO",
+                CommonName = domain
+            }, privateKey);
+
+            // Download the certificate
+            var certChain = await order.Download();
+
+            // Build PFX
+            var pfxBuilder = certChain.ToPfx(privateKey);
+            var pfxBytes = pfxBuilder.Build(domain, string.Empty);
+
+            // Save certificate
+            var certPath = Path.Combine(AppContext.BaseDirectory, "server.pfx");
+            await File.WriteAllBytesAsync(certPath, pfxBytes, cancellationToken);
+
+            // Load certificate to get details
+            var cert = new X509Certificate2(pfxBytes);
+
+            _tlsConfigured = true;
+
+            _logger.LogInformation("Let's Encrypt certificate issued successfully for {Domain}", domain);
+
+            return new TlsSetupResultDto
+            {
+                Success = true,
+                CertificateSubject = cert.Subject,
+                CertificateExpiry = cert.NotAfter,
+                Warning = request.LetsEncryptStaging 
+                    ? "This is a staging certificate (not trusted). Use production mode for a valid certificate." 
+                    : null
+            };
+        }
+        catch (AcmeRequestException ex)
+        {
+            _logger.LogError(ex, "ACME request failed for domain {Domain}", domain);
+            return new TlsSetupResultDto
+            {
+                Success = false,
+                Error = $"Let's Encrypt error: {ex.Error?.Detail ?? ex.Message}"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to request Let's Encrypt certificate for {Domain}", domain);
+            return new TlsSetupResultDto
+            {
+                Success = false,
+                Error = $"Failed to request certificate: {ex.Message}"
+            };
+        }
+    }
 
     private static X509Certificate2 GenerateSelfSignedCertificate(string subjectName)
     {

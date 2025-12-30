@@ -126,11 +126,30 @@ public sealed class CapHandler : CommandHandlerBase
     {
         context.Capabilities.IsNegotiating = false;
 
-        // Check if registration can complete
+        // Check if registration can complete - if we have both NICK and USER info
         if (context.User.RegistrationState == RegistrationState.CapNegotiating)
         {
-            // Need to wait for NICK and USER
-            context.User.SetRegistrationState(RegistrationState.None);
+            // Check if NICK and USER were received during CAP negotiation
+            if (context.User.Nickname is not null && !string.IsNullOrEmpty(context.User.Username))
+            {
+                // Both NICK and USER received, ready for registration
+                context.User.SetRegistrationState(RegistrationState.NickAndUserReceived);
+            }
+            else if (context.User.Nickname is not null)
+            {
+                // Only NICK received
+                context.User.SetRegistrationState(RegistrationState.NickReceived);
+            }
+            else if (!string.IsNullOrEmpty(context.User.Username))
+            {
+                // Only USER received
+                context.User.SetRegistrationState(RegistrationState.UserReceived);
+            }
+            else
+            {
+                // Nothing received yet
+                context.User.SetRegistrationState(RegistrationState.None);
+            }
         }
 
         return ValueTask.CompletedTask;

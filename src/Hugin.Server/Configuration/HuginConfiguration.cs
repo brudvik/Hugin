@@ -36,6 +36,11 @@ public sealed class HuginConfiguration
     public LoggingConfiguration Logging { get; set; } = new();
 
     /// <summary>
+    /// Admin panel configuration.
+    /// </summary>
+    public AdminConfiguration Admin { get; set; } = new();
+
+    /// <summary>
     /// MOTD lines.
     /// </summary>
     public List<string> Motd { get; set; } = new()
@@ -46,6 +51,58 @@ public sealed class HuginConfiguration
         "Please follow the network rules.",
         "Type /MOTD to see this message again."
     };
+}
+
+/// <summary>
+/// Admin panel configuration.
+/// </summary>
+public sealed class AdminConfiguration
+{
+    /// <summary>
+    /// Whether the admin panel is enabled.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Admin panel HTTPS port.
+    /// </summary>
+    public int Port { get; set; } = 9443;
+
+    /// <summary>
+    /// JWT configuration for authentication.
+    /// </summary>
+    public JwtConfig Jwt { get; set; } = new();
+
+    /// <summary>
+    /// Allowed CORS origins.
+    /// </summary>
+    public List<string> AllowedOrigins { get; set; } = new();
+}
+
+/// <summary>
+/// JWT configuration for admin authentication.
+/// </summary>
+public sealed class JwtConfig
+{
+    /// <summary>
+    /// Secret key for signing tokens (generated if not set).
+    /// </summary>
+    public string? SecretKey { get; set; }
+
+    /// <summary>
+    /// Token issuer.
+    /// </summary>
+    public string Issuer { get; set; } = "hugin-server";
+
+    /// <summary>
+    /// Token audience.
+    /// </summary>
+    public string Audience { get; set; } = "hugin-admin";
+
+    /// <summary>
+    /// Token expiration in minutes.
+    /// </summary>
+    public int ExpirationMinutes { get; set; } = 60;
 }
 
 public sealed class ServerIdentity
@@ -134,6 +191,12 @@ public sealed class SecurityConfiguration
     /// Whether to generate a self-signed certificate if none provided.
     /// </summary>
     public bool GenerateSelfSignedCertificate { get; set; } = true;
+
+    /// <summary>
+    /// Allow TLS 1.2 connections as a fallback for older clients.
+    /// Default is true to support common IRC clients like mIRC.
+    /// </summary>
+    public bool AllowTls12Fallback { get; set; } = true;
 
     /// <summary>
     /// Require TLS for all connections.

@@ -177,24 +177,50 @@ public sealed class ClientConnection : IClientConnection, IAsyncDisposable
 
     private static bool TryReadLine(ref ReadOnlySequence<byte> buffer, out string line)
     {
-        // Look for \r\n or \n
-        var reader = new SequenceReader<byte>(buffer);
+        // Look for \n (handles both \r\n and \n line endings)
+        var position = buffer.PositionOf((byte)'\n');
 
-        if (reader.TryReadTo(out ReadOnlySpan<byte> span, (byte)'\n'))
+        if (position == null)
         {
-            // Remove trailing \r if present
-            if (span.Length > 0 && span[^1] == '\r')
-            {
-                span = span[..^1];
-            }
+            line = string.Empty;
+            return false;
+        }
 
-            line = Encoding.UTF8.GetString(span);
-            buffer = buffer.Slice(reader.Position);
+        // Get the line content (without the \n)
+        var lineSequence = buffer.Slice(0, position.Value);
+
+        // Handle empty lines
+        if (lineSequence.Length == 0)
+        {
+            line = string.Empty;
+            buffer = buffer.Slice(buffer.GetPosition(1, position.Value));
             return true;
         }
 
-        line = string.Empty;
-        return false;
+        // Convert to string, removing trailing \r if present
+        ReadOnlySpan<byte> lineBytes;
+        byte[]? rentedArray = null;
+
+        if (lineSequence.IsSingleSegment)
+        {
+            lineBytes = lineSequence.FirstSpan;
+        }
+        else
+        {
+            rentedArray = lineSequence.ToArray();
+            lineBytes = rentedArray.AsSpan();
+        }
+
+        if (lineBytes.Length > 0 && lineBytes[^1] == '\r')
+        {
+            lineBytes = lineBytes[..^1];
+        }
+
+        line = Encoding.UTF8.GetString(lineBytes);
+
+        // Advance buffer past the \n
+        buffer = buffer.Slice(buffer.GetPosition(1, position.Value));
+        return true;
     }
 
     private async ValueTask ProcessLineAsync(string line)

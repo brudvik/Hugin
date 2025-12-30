@@ -3,9 +3,13 @@
 // Licensed under the MIT License
 
 using FluentAssertions;
+using Hugin.Core.Interfaces;
+using Hugin.Persistence;
 using Hugin.Server.Api.Controllers;
 using Hugin.Server.Api.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -17,13 +21,35 @@ namespace Hugin.Integration.Tests.Api;
 /// </summary>
 public sealed class UsersControllerTests
 {
+    private readonly Mock<IUserRepository> _userRepositoryMock;
+    private readonly Mock<IChannelRepository> _channelRepositoryMock;
+    private readonly Mock<IMessageBroker> _messageBrokerMock;
+    private readonly Mock<IConnectionManager> _connectionManagerMock;
+    private readonly Mock<IConfiguration> _configurationMock;
     private readonly Mock<ILogger<UsersController>> _loggerMock;
     private readonly UsersController _controller;
 
     public UsersControllerTests()
     {
+        _userRepositoryMock = new Mock<IUserRepository>();
+        _channelRepositoryMock = new Mock<IChannelRepository>();
+        _messageBrokerMock = new Mock<IMessageBroker>();
+        _connectionManagerMock = new Mock<IConnectionManager>();
+        _configurationMock = new Mock<IConfiguration>();
         _loggerMock = new Mock<ILogger<UsersController>>();
-        _controller = new UsersController(_loggerMock.Object);
+        
+        // Setup default returns
+        _userRepositoryMock.Setup(x => x.GetAll()).Returns(Array.Empty<Hugin.Core.Entities.User>());
+        _channelRepositoryMock.Setup(x => x.GetAll()).Returns(Array.Empty<Hugin.Core.Entities.Channel>());
+        
+        _controller = new UsersController(
+            _userRepositoryMock.Object,
+            _channelRepositoryMock.Object,
+            _messageBrokerMock.Object,
+            _connectionManagerMock.Object,
+            _configurationMock.Object,
+            null!,  // DbContext not needed for these unit tests
+            _loggerMock.Object);
     }
 
     [Fact]

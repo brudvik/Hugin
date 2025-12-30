@@ -117,6 +117,18 @@ public sealed class JoinHandler : CommandHandlerBase
         // Send JOIN to all channel members
         await context.Broker.SendToChannelAsync(channelStr, joinMsg.ToString(), null, cancellationToken);
 
+        // Broadcast join event to admin clients
+        var userEventNotifier = context.ServiceProvider(typeof(Core.Interfaces.IUserEventNotifier)) as Core.Interfaces.IUserEventNotifier;
+        if (userEventNotifier is not null)
+        {
+            await userEventNotifier.OnUserJoinAsync(
+                context.User.Nickname.Value, 
+                channelStr, 
+                context.User.DisplayedHostname, 
+                context.User.ConnectionId.ToString(), 
+                cancellationToken);
+        }
+
         // Send topic
         if (!string.IsNullOrEmpty(channel.Topic))
         {
@@ -269,6 +281,19 @@ public sealed class PartHandler : CommandHandlerBase
 
         // Send PART to all channel members (including the user parting)
         await context.Broker.SendToChannelAsync(channelStr, partMsg.ToString(), null, cancellationToken);
+
+        // Broadcast part event to admin clients
+        var userEventNotifier = context.ServiceProvider(typeof(Core.Interfaces.IUserEventNotifier)) as Core.Interfaces.IUserEventNotifier;
+        if (userEventNotifier is not null)
+        {
+            await userEventNotifier.OnUserPartAsync(
+                context.User.Nickname.Value, 
+                channelStr, 
+                context.User.DisplayedHostname, 
+                reason, 
+                context.User.ConnectionId.ToString(), 
+                cancellationToken);
+        }
 
         // Remove user from channel
         channel.RemoveMember(context.User.ConnectionId);

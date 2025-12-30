@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace Hugin.Core.Metrics;
 
 /// <summary>
@@ -25,6 +27,16 @@ public sealed class IrcMetrics
     private static readonly double[] CommandDurationBuckets = [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0];
 
     private readonly MetricsCollector _collector;
+
+    // Rate tracking for real-time stats (sliding window)
+    private readonly ConcurrentQueue<(DateTime Time, int Count)> _messageWindow = new();
+    private readonly ConcurrentQueue<(DateTime Time, long Bytes, bool Incoming)> _bytesWindow = new();
+    private readonly TimeSpan _windowDuration = TimeSpan.FromSeconds(10);
+    private long _totalMessagesReceived;
+    private long _totalMessagesSent;
+    private long _totalBytesIn;
+    private long _totalBytesOut;
+    private int _pendingOperations;
 
     // Connection metrics
     private readonly Counter _connectionsTotal;
@@ -216,10 +228,74 @@ public sealed class IrcMetrics
         _messagesReceived.Inc();
         _messagesByCommand.Inc(command);
         _messageSizeBytes.Observe(sizeBytes);
+        
+        // Track for rate calculation
+        Interlocked.Increment(ref _totalMessagesReceived);
+        _messageWindow.Enqueue((DateTime.UtcNow, 1));
+        RecordBytes(sizeBytes, true);
+        CleanupOldEntries();
     }
     
     /// <summary>Records a sent message.</summary>
-    public void MessageSent() => _messagesSent.Inc();
+    public void MessageSent() 
+    {
+        _messagesSent.Inc();
+        Interlocked.Increment(ref _totalMessagesSent);
+    }
+
+    /// <summary>Records bytes transferred.</summary>
+    public void RecordBytes(long bytes, bool incoming)
+    {
+        _bytesWindow.Enqueue((DateTime.UtcNow, bytes, incoming));
+        if (incoming)
+            Interlocked.Add(ref _totalBytesIn, bytes);
+        else
+            Interlocked.Add(ref _totalBytesOut, bytes);
+    }
+
+    /// <summary>Increments pending operations counter.</summary>
+    public void IncrementPendingOperations() => Interlocked.Increment(ref _pendingOperations);
+
+    /// <summary>Decrements pending operations counter.</summary>
+    public void DecrementPendingOperations() => Interlocked.Decrement(ref _pendingOperations);
+
+    /// <summary>Gets the current pending operations count.</summary>
+    public int GetPendingOperations() => _pendingOperations;
+
+    /// <summary>Gets the total messages received.</summary>
+    public long GetTotalMessagesReceived() => Interlocked.Read(ref _totalMessagesReceived);
+
+    /// <summary>Gets the total messages sent.</summary>
+    public long GetTotalMessagesSent() => Interlocked.Read(ref _totalMessagesSent);
+
+    /// <summary>Calculates messages per second over the sliding window.</summary>
+    public double GetMessagesPerSecond()
+    {
+        CleanupOldEntries();
+        var cutoff = DateTime.UtcNow - _windowDuration;
+        var count = _messageWindow.Count(m => m.Time > cutoff);
+        return count / _windowDuration.TotalSeconds;
+    }
+
+    /// <summary>Calculates bytes per second over the sliding window.</summary>
+    public double GetBytesPerSecond(bool incoming)
+    {
+        CleanupOldEntries();
+        var cutoff = DateTime.UtcNow - _windowDuration;
+        var bytes = _bytesWindow.Where(b => b.Time > cutoff && b.Incoming == incoming).Sum(b => b.Bytes);
+        return bytes / _windowDuration.TotalSeconds;
+    }
+
+    private void CleanupOldEntries()
+    {
+        var cutoff = DateTime.UtcNow - _windowDuration - TimeSpan.FromSeconds(5);
+        
+        while (_messageWindow.TryPeek(out var msg) && msg.Time < cutoff)
+            _messageWindow.TryDequeue(out _);
+        
+        while (_bytesWindow.TryPeek(out var b) && b.Time < cutoff)
+            _bytesWindow.TryDequeue(out _);
+    }
 
     // Command methods
     

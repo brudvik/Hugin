@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hugin IRC Server - Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root { --hugin-primary: #2c3e50; --hugin-secondary: #3498db; }
+        body { background: #f8f9fa; }
+        .sidebar { 
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh; 
+            width: 250px;
+            position: fixed;
+            left: 0;
+            top: 0;
+        }
+        .sidebar .nav-link { color: rgba(255,255,255,0.7); padding: 0.75rem 1.5rem; }
+        .sidebar .nav-link:hover { color: white; background: rgba(255,255,255,0.1); }
+        .sidebar .nav-link.active { color: white; background: var(--hugin-secondary); }
+        .sidebar .nav-link i { width: 24px; }
+        .main-content { margin-left: 250px; padding: 2rem; }
+        .stat-card { border: none; border-radius: 1rem; }
+        .stat-card .stat-value { font-size: 2.5rem; font-weight: 700; }
+        .stat-card.users { border-left: 4px solid #3498db; }
+        .stat-card.channels { border-left: 4px solid #2ecc71; }
+        .stat-card.messages { border-left: 4px solid #9b59b6; }
+        .stat-card.uptime { border-left: 4px solid #e74c3c; }
+        .logo-text { color: white; font-size: 1.5rem; padding: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="logo-text">
+            <i class="bi bi-hdd-network me-2"></i>Hugin
+        </div>
+        <ul class="nav flex-column mt-3">
+            <li class="nav-item">
+                <a class="nav-link active" href="/admin/dashboard">
+                    <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/users">
+                    <i class="bi bi-people me-2"></i>Users
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/channels">
+                    <i class="bi bi-hash me-2"></i>Channels
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/operators">
+                    <i class="bi bi-shield-check me-2"></i>Operators
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/config">
+                    <i class="bi bi-gear me-2"></i>Configuration
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/logs">
+                    <i class="bi bi-journal-text me-2"></i>Logs
+                </a>
+            </li>
+            <li class="nav-item mt-4">
+                <a class="nav-link" href="#" onclick="logout()">
+                    <i class="bi bi-box-arrow-left me-2"></i>Logout
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Dashboard</h2>
+            <span class="text-muted" id="serverName">Loading...</span>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-md-6 col-xl-3">
+                <div class="card stat-card users">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="text-muted small">Connected Users</div>
+                                <div class="stat-value" id="userCount">-</div>
+                            </div>
+                            <div class="text-primary opacity-50">
+                                <i class="bi bi-people" style="font-size: 3rem;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="card stat-card channels">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="text-muted small">Active Channels</div>
+                                <div class="stat-value" id="channelCount">-</div>
+                            </div>
+                            <div class="text-success opacity-50">
+                                <i class="bi bi-hash" style="font-size: 3rem;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="card stat-card messages">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="text-muted small">Messages/min</div>
+                                <div class="stat-value" id="messagesPerMin">-</div>
+                            </div>
+                            <div class="text-purple opacity-50">
+                                <i class="bi bi-chat-dots" style="font-size: 3rem;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="card stat-card uptime">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="text-muted small">Uptime</div>
+                                <div class="stat-value" id="uptime">-</div>
+                            </div>
+                            <div class="text-danger opacity-50">
+                                <i class="bi bi-clock-history" style="font-size: 3rem;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-activity me-2"></i>Server Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <tbody id="statusTable">
+                                    <tr><td colspan="2" class="text-center text-muted">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Quick Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="/api/docs" class="btn btn-outline-primary" target="_blank">
+                                <i class="bi bi-book me-2"></i>API Documentation
+                            </a>
+                            <a href="/admin/config" class="btn btn-outline-secondary">
+                                <i class="bi bi-gear me-2"></i>Server Configuration
+                            </a>
+                            <button class="btn btn-outline-info" onclick="refreshStats()">
+                                <i class="bi bi-arrow-clockwise me-2"></i>Refresh Stats
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const token = localStorage.getItem('hugin_token');
+        
+        // Redirect to login if no token
+        if (!token) {
+            window.location.href = '/admin/login';
+        }
+        
+        async function fetchWithAuth(url) {
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.status === 401) {
+                localStorage.removeItem('hugin_token');
+                window.location.href = '/admin/login';
+                return null;
+            }
+            return response.json();
+        }
+        
+        async function loadStats() {
+            try {
+                const data = await fetchWithAuth('/api/status');
+                if (data && data.data) {
+                    const s = data.data;
+                    document.getElementById('serverName').textContent = s.serverName || 'Hugin IRC Server';
+                    document.getElementById('userCount').textContent = s.connectedUsers ?? 0;
+                    document.getElementById('channelCount').textContent = s.channelCount ?? 0;
+                    
+                    // Convert messages/sec to messages/min and round
+                    const messagesPerMin = Math.round((s.statistics?.messagesPerSecond ?? 0) * 60);
+                    document.getElementById('messagesPerMin').textContent = messagesPerMin;
+                    
+                    // Uptime is a TimeSpan string like "01:23:45" or object
+                    let uptimeSeconds = 0;
+                    if (s.uptime) {
+                        if (typeof s.uptime === 'string') {
+                            // Parse TimeSpan format "hh:mm:ss" or "d.hh:mm:ss"
+                            const parts = s.uptime.split(':');
+                            if (parts.length >= 3) {
+                                const dayPart = parts[0].includes('.') ? parts[0].split('.') : [0, parts[0]];
+                                uptimeSeconds = parseInt(dayPart[0] || 0) * 86400 + parseInt(dayPart[1] || parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2]);
+                            }
+                        } else if (s.uptime.totalSeconds) {
+                            uptimeSeconds = s.uptime.totalSeconds;
+                        }
+                    }
+                    document.getElementById('uptime').textContent = formatUptime(uptimeSeconds);
+                    
+                    document.getElementById('statusTable').innerHTML = `
+                        <tr><td>Server Name</td><td><strong>${s.serverName || '-'}</strong></td></tr>
+                        <tr><td>Network</td><td>${s.networkName || '-'}</td></tr>
+                        <tr><td>Version</td><td>${s.version || '-'}</td></tr>
+                        <tr><td>IRC Port</td><td>6697 (TLS)</td></tr>
+                        <tr><td>Operators Online</td><td>${s.operatorsOnline ?? 0}</td></tr>
+                        <tr><td>Memory Usage</td><td>${s.statistics?.memoryUsageBytes ? (s.statistics.memoryUsageBytes / 1048576).toFixed(1) + ' MB' : '-'}</td></tr>
+                    `;
+                }
+            } catch (e) {
+                console.error('Failed to load stats:', e);
+            }
+        }
+        
+        function formatUptime(seconds) {
+            if (seconds < 60) return seconds + 's';
+            if (seconds < 3600) return Math.floor(seconds / 60) + 'm';
+            if (seconds < 86400) return Math.floor(seconds / 3600) + 'h';
+            return Math.floor(seconds / 86400) + 'd';
+        }
+        
+        function refreshStats() {
+            loadStats();
+        }
+        
+        function logout() {
+            localStorage.removeItem('hugin_token');
+            window.location.href = '/admin/login';
+        }
+        
+        // Load stats on page load
+        loadStats();
+        
+        // Refresh every 30 seconds
+        setInterval(loadStats, 30000);
+    </script>
+</body>
+</html>

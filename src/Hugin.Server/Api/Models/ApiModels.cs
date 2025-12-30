@@ -435,6 +435,16 @@ public sealed class SetupTlsRequest
     /// Domain names for Let's Encrypt.
     /// </summary>
     public string[]? LetsEncryptDomains { get; init; }
+
+    /// <summary>
+    /// Primary domain for Let's Encrypt certificate.
+    /// </summary>
+    public string? LetsEncryptDomain { get; init; }
+
+    /// <summary>
+    /// Use Let's Encrypt staging server (for testing).
+    /// </summary>
+    public bool LetsEncryptStaging { get; init; }
 }
 
 /// <summary>

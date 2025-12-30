@@ -144,6 +144,56 @@ tests/
 | WHOX | ✅ | Extended WHO queries |
 | WebSocket | ✅ | Browser-based IRC connections |
 
+## 🤖 Network Services
+
+Hugin includes built-in network services for enhanced functionality:
+
+| Service | Status | Description |
+|---------|--------|-------------|
+| **NickServ** | ✅ | Nickname registration and authentication |
+| **ChanServ** | ✅ | Channel registration and management |
+| **MemoServ** | ✅ | Offline messaging between registered users |
+| **OperServ** | ✅ | Network administration and operator tools |
+| **BotServ** | ✅ | Bot hosting for channels with customizable greetings |
+| **HostServ** | ✅ | Virtual host requests, approval, and activation |
+
+### MemoServ Commands
+- `SEND <nick> <message>` - Send offline message to registered user
+- `LIST` - View all your memos with preview
+- `READ <number>` - Read a specific memo
+- `DELETE <number>` - Delete a memo
+- `CLEAR` - Delete all memos
+
+### OperServ Commands (IRC Operators only)
+- `AKILL` - Network-wide autokills with expiration support
+- `JUPE` - Block server names from linking
+- `STATS` - Display network statistics
+- `RESTART/DIE` - Server control commands
+- `MODE` - Force mode changes on channels or users
+- `KICK` - Force a kick from a channel
+- `KILL` - Disconnect a user from the network
+- `RAW` - Send raw S2S commands (dangerous)
+- `GLOBAL` - Send a global notice to all users
+
+### BotServ Commands
+- `BOTLIST` - List available bots for assignment
+- `ASSIGN <#channel> <bot>` - Assign bot to your channel
+- `UNASSIGN <#channel> <bot>` - Remove bot from channel
+- `SAY <#channel> <bot> <msg>` - Make bot say something
+- `ACT <#channel> <bot> <action>` - Make bot perform action
+- `INFO <#channel>` - View assigned bots and settings
+- `SET <#channel> <bot> GREET ON/OFF` - Toggle auto-greet
+- `SET <#channel> <bot> GREETMSG <msg>` - Set greet message
+
+### HostServ Commands
+- `REQUEST <hostname>` - Request a virtual host (validated for length/dots/no IP)
+- `ACTIVATE` / `OFF` - Enable or disable your approved vhost
+- `DELETE <hostname>` - Delete one of your vhosts
+- `LIST` - List your vhosts with status (pending/approved/active)
+- `APPROVE <hostname>` - Approve a pending vhost (IRC operators only)
+- `REJECT <hostname> [reason]` - Reject and delete a pending vhost (IRC operators only)
+- `WAITING` - Show all pending vhost requests (IRC operators only)
+
 ## 🔌 Extensibility
 
 Hugin supports three ways to extend functionality:

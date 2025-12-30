@@ -2,6 +2,8 @@
 // Copyright (c) 2024 Hugin Contributors
 // Licensed under the MIT License
 
+using Hugin.Core.Entities;
+using Hugin.Core.Interfaces;
 using Hugin.Server.Api.Auth;
 using Hugin.Server.Api.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -17,13 +19,17 @@ namespace Hugin.Server.Api.Controllers;
 [Authorize(Roles = AdminRoles.Admin)]
 public sealed class OperatorsController : ControllerBase
 {
+    private readonly IOperatorConfigService _operatorService;
     private readonly ILogger<OperatorsController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OperatorsController"/> class.
     /// </summary>
-    public OperatorsController(ILogger<OperatorsController> logger)
+    public OperatorsController(
+        IOperatorConfigService operatorService,
+        ILogger<OperatorsController> logger)
     {
+        _operatorService = operatorService;
         _logger = logger;
     }
 
@@ -34,9 +40,10 @@ public sealed class OperatorsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<OperatorDto[]>), StatusCodes.Status200OK)]
     public IActionResult GetOperators()
     {
-        // TODO: Get operators from configuration
-        var operators = new List<OperatorDto>();
-        return Ok(ApiResponse<OperatorDto[]>.Ok(operators.ToArray()));
+        var operators = _operatorService.GetAllOperators()
+            .Select(MapOperatorToDto)
+            .ToArray();
+        return Ok(ApiResponse<OperatorDto[]>.Ok(operators));
     }
 
     /// <summary>
@@ -47,8 +54,15 @@ public sealed class OperatorsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public IActionResult GetOperator(string name)
     {
-        // TODO: Get operator from configuration
-        return NotFound(ApiResponse.Fail($"Operator '{name}' not found"));
+        var decodedName = System.Web.HttpUtility.UrlDecode(name);
+        var oper = _operatorService.GetOperator(decodedName);
+        
+        if (oper == null)
+        {
+            return NotFound(ApiResponse.Fail($"Operator '{decodedName}' not found"));
+        }
+
+        return Ok(ApiResponse<OperatorDto>.Ok(MapOperatorToDto(oper)));
     }
 
     /// <summary>
@@ -64,20 +78,32 @@ public sealed class OperatorsController : ControllerBase
             return BadRequest(ApiResponse.Fail("Invalid operator configuration"));
         }
 
-        // TODO: Create operator
-        _logger.LogInformation("Operator {Name} created by {Admin}", request.Name, User.Identity?.Name);
+        // Check if operator already exists
+        if (_operatorService.GetOperator(request.Name) != null)
+        {
+            return BadRequest(ApiResponse.Fail($"Operator '{request.Name}' already exists"));
+        }
 
-        var oper = new OperatorDto
+        // Password is required for new operators
+        if (string.IsNullOrWhiteSpace(request.Password))
+        {
+            return BadRequest(ApiResponse.Fail("Password is required for new operators"));
+        }
+
+        var operConfig = new OperatorConfig
         {
             Name = request.Name,
+            PasswordHash = Hugin.Security.PasswordHasher.HashPassword(request.Password),
             OperClass = request.OperClass,
             Hostmasks = request.Hostmasks ?? [],
-            IsOnline = false,
-            Permissions = []
+            Permissions = GetDefaultPermissions(request.OperClass)
         };
 
+        _operatorService.AddOrUpdateOperator(operConfig);
+        _logger.LogInformation("Operator {Name} created by {Admin}", request.Name, User.Identity?.Name);
+
         return CreatedAtAction(nameof(GetOperator), new { name = request.Name }, 
-            ApiResponse<OperatorDto>.Ok(oper));
+            ApiResponse<OperatorDto>.Ok(MapOperatorToDto(operConfig)));
     }
 
     /// <summary>
@@ -88,8 +114,32 @@ public sealed class OperatorsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public IActionResult UpdateOperator(string name, [FromBody] OperatorRequest request)
     {
-        // TODO: Update operator
-        _logger.LogInformation("Operator {Name} updated by {Admin}", name, User.Identity?.Name);
+        var decodedName = System.Web.HttpUtility.UrlDecode(name);
+        var existingOper = _operatorService.GetOperator(decodedName);
+        
+        if (existingOper == null)
+        {
+            return NotFound(ApiResponse.Fail($"Operator '{decodedName}' not found"));
+        }
+
+        // Update fields
+        existingOper.OperClass = request.OperClass;
+        if (request.Hostmasks != null)
+        {
+            existingOper.Hostmasks = request.Hostmasks;
+        }
+        
+        // Update password only if provided
+        if (!string.IsNullOrWhiteSpace(request.Password))
+        {
+            existingOper.PasswordHash = Hugin.Security.PasswordHasher.HashPassword(request.Password);
+        }
+        
+        existingOper.Permissions = GetDefaultPermissions(request.OperClass);
+
+        _operatorService.AddOrUpdateOperator(existingOper);
+        _logger.LogInformation("Operator {Name} updated by {Admin}", decodedName, User.Identity?.Name);
+        
         return Ok(ApiResponse.Ok("Operator updated"));
     }
 
@@ -101,9 +151,45 @@ public sealed class OperatorsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public IActionResult DeleteOperator(string name)
     {
-        // TODO: Delete operator
-        _logger.LogWarning("Operator {Name} deleted by {Admin}", name, User.Identity?.Name);
+        var decodedName = System.Web.HttpUtility.UrlDecode(name);
+        
+        if (!_operatorService.RemoveOperator(decodedName))
+        {
+            return NotFound(ApiResponse.Fail($"Operator '{decodedName}' not found"));
+        }
+
+        _logger.LogWarning("Operator {Name} deleted by {Admin}", decodedName, User.Identity?.Name);
         return Ok(ApiResponse.Ok("Operator deleted"));
+    }
+
+    /// <summary>
+    /// Maps an OperatorConfig to OperatorDto.
+    /// </summary>
+    private static OperatorDto MapOperatorToDto(OperatorConfig config)
+    {
+        return new OperatorDto
+        {
+            Name = config.Name,
+            OperClass = config.OperClass,
+            Hostmasks = config.Hostmasks,
+            IsOnline = config.IsOnline,
+            LastSeen = config.LastSeen,
+            Permissions = config.Permissions
+        };
+    }
+
+    /// <summary>
+    /// Gets default permissions based on operator class.
+    /// </summary>
+    private static string[] GetDefaultPermissions(string operClass)
+    {
+        return operClass.ToLowerInvariant() switch
+        {
+            "admin" => ["kill", "kline", "gline", "zline", "rehash", "restart", "die", "wallops"],
+            "global" => ["kill", "kline", "gline", "wallops"],
+            "local" => ["kill", "kline"],
+            _ => []
+        };
     }
 }
 
@@ -115,13 +201,17 @@ public sealed class OperatorsController : ControllerBase
 [Authorize(Roles = $"{AdminRoles.Admin},{AdminRoles.Operator}")]
 public sealed class BansController : ControllerBase
 {
+    private readonly IServerBanRepository _banRepository;
     private readonly ILogger<BansController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BansController"/> class.
     /// </summary>
-    public BansController(ILogger<BansController> logger)
+    public BansController(
+        IServerBanRepository banRepository,
+        ILogger<BansController> logger)
     {
+        _banRepository = banRepository;
         _logger = logger;
     }
 
@@ -136,13 +226,36 @@ public sealed class BansController : ControllerBase
         [FromQuery] string? type = null,
         [FromQuery] string? search = null)
     {
-        // TODO: Get bans from ban manager
-        var bans = new List<ServerBanDto>();
+        var allBans = _banRepository.GetAllActive();
+
+        // Filter by type
+        if (!string.IsNullOrWhiteSpace(type) && Enum.TryParse<BanType>(type, true, out var banType))
+        {
+            allBans = allBans.Where(b => b.Type == banType).ToList();
+        }
+
+        // Filter by search
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchLower = search.ToLowerInvariant();
+            allBans = allBans.Where(b =>
+                b.Pattern.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ||
+                b.Reason.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ||
+                b.SetBy.Contains(searchLower, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        var totalCount = allBans.Count;
+        var bans = allBans
+            .OrderByDescending(b => b.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(MapBanToDto)
+            .ToArray();
 
         var result = new PagedResult<ServerBanDto>
         {
-            Items = bans.ToArray(),
-            TotalCount = 0,
+            Items = bans,
+            TotalCount = totalCount,
             Page = page,
             PageSize = pageSize
         };
@@ -158,8 +271,20 @@ public sealed class BansController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public IActionResult GetBan(string id)
     {
-        // TODO: Get ban from ban manager
-        return NotFound(ApiResponse.Fail($"Ban '{id}' not found"));
+        if (!Guid.TryParse(id, out var banId))
+        {
+            return NotFound(ApiResponse.Fail($"Invalid ban ID format '{id}'"));
+        }
+
+        var allBans = _banRepository.GetAllActive();
+        var ban = allBans.FirstOrDefault(b => b.Id == banId);
+
+        if (ban == null)
+        {
+            return NotFound(ApiResponse.Fail($"Ban '{id}' not found"));
+        }
+
+        return Ok(ApiResponse<ServerBanDto>.Ok(MapBanToDto(ban)));
     }
 
     /// <summary>
@@ -175,27 +300,30 @@ public sealed class BansController : ControllerBase
             return BadRequest(ApiResponse.Fail("Invalid ban configuration"));
         }
 
-        // TODO: Create ban
-        var banId = Guid.NewGuid().ToString("N")[..8];
-        _logger.LogWarning("Ban created by {Admin}: {Type} {Mask} - {Reason}", 
-            User.Identity?.Name, request.Type, request.Mask, request.Reason);
-
-        var ban = new ServerBanDto
+        if (!Enum.TryParse<BanType>(request.Type, true, out var banType))
         {
-            Id = banId,
-            Type = request.Type,
-            Mask = request.Mask,
-            Reason = request.Reason,
-            SetBy = User.Identity?.Name ?? "admin",
-            SetAt = DateTimeOffset.UtcNow,
-            ExpiresAt = request.DurationSeconds.HasValue 
-                ? DateTimeOffset.UtcNow.AddSeconds(request.DurationSeconds.Value) 
-                : null,
-            AffectedCount = 0
-        };
+            return BadRequest(ApiResponse.Fail($"Invalid ban type: {request.Type}. Valid types: KLine, GLine, ZLine, Jupe"));
+        }
 
-        return CreatedAtAction(nameof(GetBan), new { id = banId }, 
-            ApiResponse<ServerBanDto>.Ok(ban));
+        var adminUser = User.Identity?.Name ?? "admin";
+        var duration = request.DurationSeconds.HasValue
+            ? TimeSpan.FromSeconds(request.DurationSeconds.Value)
+            : (TimeSpan?)null;
+
+        var serverBan = new ServerBan(
+            banType,
+            request.Mask,
+            request.Reason,
+            adminUser,
+            duration);
+
+        _banRepository.Add(serverBan);
+
+        _logger.LogWarning("Ban created by {Admin}: {Type} {Mask} - {Reason}",
+            adminUser, request.Type, request.Mask, request.Reason);
+
+        return CreatedAtAction(nameof(GetBan), new { id = serverBan.Id.ToString() },
+            ApiResponse<ServerBanDto>.Ok(MapBanToDto(serverBan)));
     }
 
     /// <summary>
@@ -206,7 +334,17 @@ public sealed class BansController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public IActionResult RemoveBan(string id)
     {
-        // TODO: Remove ban
+        if (!Guid.TryParse(id, out var banId))
+        {
+            return NotFound(ApiResponse.Fail($"Invalid ban ID format '{id}'"));
+        }
+
+        var removed = _banRepository.Remove(banId);
+        if (!removed)
+        {
+            return NotFound(ApiResponse.Fail($"Ban '{id}' not found"));
+        }
+
         _logger.LogInformation("Ban {Id} removed by {Admin}", id, User.Identity?.Name);
         return Ok(ApiResponse.Ok("Ban removed"));
     }
@@ -218,17 +356,36 @@ public sealed class BansController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<BanStatsDto>), StatusCodes.Status200OK)]
     public IActionResult GetBanStats()
     {
-        // TODO: Get stats from ban manager
+        var allBans = _banRepository.GetAllActive();
+
         var stats = new BanStatsDto
         {
-            TotalBans = 0,
-            ActiveKLines = 0,
-            ActiveGLines = 0,
-            ActiveZLines = 0,
-            ExpiredToday = 0
+            TotalBans = allBans.Count,
+            ActiveKLines = allBans.Count(b => b.Type == BanType.KLine),
+            ActiveGLines = allBans.Count(b => b.Type == BanType.GLine),
+            ActiveZLines = allBans.Count(b => b.Type == BanType.ZLine),
+            ExpiredToday = 0 // Would need to track expired bans separately
         };
 
         return Ok(ApiResponse<BanStatsDto>.Ok(stats));
+    }
+
+    /// <summary>
+    /// Maps a ServerBan entity to DTO.
+    /// </summary>
+    private static ServerBanDto MapBanToDto(ServerBan ban)
+    {
+        return new ServerBanDto
+        {
+            Id = ban.Id.ToString(),
+            Type = ban.Type.ToString(),
+            Mask = ban.Pattern,
+            Reason = ban.Reason,
+            SetBy = ban.SetBy,
+            SetAt = ban.CreatedAt,
+            ExpiresAt = ban.ExpiresAt,
+            AffectedCount = 0
+        };
     }
 }
 

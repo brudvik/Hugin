@@ -15,6 +15,7 @@ public sealed class ChanServTests
 {
     private readonly Mock<IChannelRepository> _channelRepository;
     private readonly Mock<IAccountRepository> _accountRepository;
+    private readonly Mock<IRegisteredChannelRepository> _registeredChannelRepository;
     private readonly Mock<IServicesManager> _servicesManager;
     private readonly ChanServ _chanServ;
     private readonly ServerId _serverId;
@@ -23,11 +24,13 @@ public sealed class ChanServTests
     {
         _channelRepository = new Mock<IChannelRepository>();
         _accountRepository = new Mock<IAccountRepository>();
+        _registeredChannelRepository = new Mock<IRegisteredChannelRepository>();
         _servicesManager = new Mock<IServicesManager>();
         _serverId = ServerId.Create("001", "irc.test.net");
         _chanServ = new ChanServ(
             _channelRepository.Object,
-            _accountRepository.Object,
+            () => _accountRepository.Object,
+            () => _registeredChannelRepository.Object,
             _serverId,
             "services.test.net",
             NullLogger<ChanServ>.Instance);

@@ -169,14 +169,38 @@ $serverProcess = Start-Process -FilePath "dotnet" `
 
 Write-Info "Server process started (PID: $($serverProcess.Id))"
 
-# Wait for server to be ready
-$adminUrl = "https://localhost:$AdminPort"
-$healthUrl = "$adminUrl/api/status/health"
-
 Write-Step "Waiting for server to start..."
 Write-Host "    " -NoNewline
 
-$serverStatus = Wait-ForServer -Url $healthUrl -TimeoutSeconds 30 -Process $serverProcess
+# Wait for server to start by checking the log file for success message
+$serverStatus = "timeout"
+$elapsed = 0
+$maxWait = 30
+
+while ($elapsed -lt $maxWait) {
+    # Check if process crashed
+    if ($serverProcess.HasExited) {
+        $serverStatus = "crashed"
+        break
+    }
+    
+    # Check log for success message
+    if (Test-Path $logFile) {
+        $logContent = Get-Content $logFile -Raw -ErrorAction SilentlyContinue
+        if ($logContent -match "Server started successfully") {
+            $serverStatus = "ready"
+            break
+        }
+        if ($logContent -match "FTL\]|FATAL|Host terminated unexpectedly") {
+            $serverStatus = "crashed"
+            break
+        }
+    }
+    
+    Start-Sleep -Seconds 1
+    $elapsed++
+    Write-Host "." -NoNewline -ForegroundColor DarkGray
+}
 
 Write-Host ""
 
@@ -195,6 +219,7 @@ if ($serverStatus -eq "crashed" -or $serverProcess.HasExited) {
     }
     
     # Check for common errors and provide helpful messages
+    # Order matters - check more specific patterns first
     if ($errorContent -match "password authentication failed|28P01") {
         Write-Host "  ╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Red
         Write-Host "  ║  " -NoNewline -ForegroundColor Red
@@ -215,7 +240,7 @@ if ($serverStatus -eq "crashed" -or $serverProcess.HasExited) {
         Write-Host "     src\Hugin.Server\appsettings.Development.json" -ForegroundColor Cyan
         Write-Host ""
     }
-    elseif ($errorContent -match "permission denied|42501") {
+    elseif ($errorContent -match "permission denied for schema|42501") {
         Write-Host "  ╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Red
         Write-Host "  ║  " -NoNewline -ForegroundColor Red
         Write-Host "DATABASE PERMISSION DENIED" -NoNewline -ForegroundColor White
@@ -249,7 +274,7 @@ if ($serverStatus -eq "crashed" -or $serverProcess.HasExited) {
         Write-Host "     # or check Services (services.msc)" -ForegroundColor DarkGray
         Write-Host ""
     }
-    elseif ($errorContent -match "certificate|ssl|tls") {
+    elseif ($errorContent -match "(?<!permission denied.*)certificate|(?<!permission denied.*)ssl error|tls handshake") {
         Write-Host "  ╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Red
         Write-Host "  ║  " -NoNewline -ForegroundColor Red
         Write-Host "TLS/CERTIFICATE ERROR" -NoNewline -ForegroundColor White
@@ -258,6 +283,26 @@ if ($serverStatus -eq "crashed" -or $serverProcess.HasExited) {
         Write-Host ""
         Write-Host "  There was an issue with TLS certificates." -ForegroundColor Yellow
         Write-Host "  Check src\Hugin.Server\appsettings.Development.json" -ForegroundColor DarkGray
+        Write-Host ""
+    }
+    elseif ($errorContent -match "MissingMethodException|No parameterless constructor") {
+        Write-Host "  ╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Red
+        Write-Host "  ║  " -NoNewline -ForegroundColor Red
+        Write-Host "CODE ERROR - MISSING CONSTRUCTOR" -NoNewline -ForegroundColor White
+        Write-Host "                        ║" -ForegroundColor Red
+        Write-Host "  ╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  A command handler is missing a required constructor." -ForegroundColor Yellow
+        Write-Host "  This is a code issue. Please rebuild with:" -ForegroundColor DarkGray
+        Write-Host ""
+        Write-Host "     dotnet build" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "  If the issue persists, check the error details below." -ForegroundColor DarkGray
+        Write-Host ""
+        # Show the specific error
+        if ($errorContent -match "type '([^']+)'") {
+            Write-Host "  Affected type: $($Matches[1])" -ForegroundColor Yellow
+        }
         Write-Host ""
     }
     else {
@@ -283,9 +328,16 @@ if ($serverStatus -eq "crashed" -or $serverProcess.HasExited) {
 }
 
 if ($serverStatus -eq "timeout") {
-    Write-Error-Custom "Server failed to respond within 30 seconds"
-    Write-Info "The server process is running but not responding."
-    Write-Info "Check firewall settings or try a different port with -AdminPort"
+    Write-Error-Custom "Server failed to start within 30 seconds"
+    Write-Info "The server process is running but no startup confirmation was logged."
+    Write-Info "Check the log file for more details."
+    
+    # Show last few lines of log
+    if (Test-Path $logFile) {
+        Write-Host ""
+        Write-Host "  Log output:" -ForegroundColor Yellow
+        Get-Content $logFile -Tail 5 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    }
     
     # Cleanup
     Stop-Process -Id $serverProcess.Id -Force -ErrorAction SilentlyContinue
@@ -310,15 +362,14 @@ Write-Info "Server running in console window (PID: $($serverProcess.Id))"
 
 Write-Success "Server is running!"
 
-# Open browser
+# Open admin panel in browser
+$adminUrl = "https://localhost:$AdminPort"
 $setupUrl = "$adminUrl/admin/setup"
 
 if (-not $NoBrowser) {
     Write-Step "Opening admin panel in browser..."
-    Write-Info $setupUrl
+    Start-Sleep -Seconds 2  # Give server time to fully start
     Start-Process $setupUrl
-} else {
-    Write-Info "Skipping browser open (using -NoBrowser)"
 }
 
 # Display summary
@@ -332,8 +383,11 @@ Write-Host "  Admin Panel:    " -NoNewline -ForegroundColor Yellow
 Write-Host "$adminUrl/admin" -ForegroundColor Cyan
 Write-Host "  Setup Wizard:   " -NoNewline -ForegroundColor Yellow
 Write-Host "$setupUrl" -ForegroundColor Cyan
-Write-Host "  API Health:     " -NoNewline -ForegroundColor Yellow
-Write-Host "$healthUrl" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  IRC Port:       " -NoNewline -ForegroundColor Yellow
+Write-Host "6697 (TLS)" -ForegroundColor Cyan
+Write-Host "  Server Name:    " -NoNewline -ForegroundColor Yellow
+Write-Host "irc.hugin.local" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Default Login:" -ForegroundColor Yellow
 Write-Host "    Username:     " -NoNewline -ForegroundColor DarkGray

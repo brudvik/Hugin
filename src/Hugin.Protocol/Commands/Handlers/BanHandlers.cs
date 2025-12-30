@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Hugin.Core.Entities;
 using Hugin.Core.Interfaces;
 
@@ -10,14 +11,21 @@ namespace Hugin.Protocol.Commands.Handlers;
 public sealed class KlineHandler : CommandHandlerBase
 {
     private readonly IServerBanRepository _banRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly IConnectionManager _connectionManager;
 
     public override string Command => "KLINE";
     public override int MinimumParameters => 2;
     public override bool RequiresOperator => true;
 
-    public KlineHandler(IServerBanRepository banRepository)
+    public KlineHandler(
+        IServerBanRepository banRepository, 
+        IUserRepository userRepository,
+        IConnectionManager connectionManager)
     {
         _banRepository = banRepository;
+        _userRepository = userRepository;
+        _connectionManager = connectionManager;
     }
 
     public override async ValueTask HandleAsync(CommandContext context, CancellationToken cancellationToken = default)
@@ -70,7 +78,55 @@ public sealed class KlineHandler : CommandHandlerBase
             IrcMessage.CreateWithSource(server, "NOTICE", "*", notice).ToString(),
             cancellationToken);
 
-        // TODO: Disconnect affected users
+        // Disconnect affected users
+        await DisconnectMatchingUsersAsync(pattern, reason, server, context.Broker, cancellationToken);
+    }
+
+    /// <summary>
+    /// Disconnects all users matching the given ban pattern.
+    /// </summary>
+    private async ValueTask DisconnectMatchingUsersAsync(
+        string pattern, 
+        string reason, 
+        string serverName,
+        IMessageBroker broker,
+        CancellationToken cancellationToken)
+    {
+        var regex = CreateBanRegex(pattern);
+        var matchedUsers = _userRepository.GetAll()
+            .Where(u => u.IsRegistered && regex.IsMatch(u.Hostmask.ToString()))
+            .ToList();
+
+        foreach (var user in matchedUsers)
+        {
+            // Send error message before closing
+            var killMessage = IrcMessage.CreateWithSource(
+                serverName, 
+                "ERROR", 
+                $"Closing Link: K-Lined: {reason}");
+            
+            await broker.SendToConnectionAsync(
+                user.ConnectionId, 
+                killMessage.ToString(), 
+                cancellationToken);
+
+            // Close the connection
+            await _connectionManager.CloseConnectionAsync(
+                user.ConnectionId, 
+                $"K-Lined: {reason}", 
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Creates a regex from a ban pattern (supports * and ? wildcards).
+    /// </summary>
+    private static Regex CreateBanRegex(string pattern)
+    {
+        var regexPattern = "^" + Regex.Escape(pattern)
+            .Replace("\\*", ".*")
+            .Replace("\\?", ".") + "$";
+        return new Regex(regexPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
     }
 
     private static bool TryParseDuration(string input, out TimeSpan duration)

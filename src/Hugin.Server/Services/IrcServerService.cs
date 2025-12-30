@@ -2,11 +2,13 @@ using System.Net;
 using Hugin.Core.Entities;
 using Hugin.Core.Enums;
 using Hugin.Core.Interfaces;
+using Hugin.Core.Metrics;
 using Hugin.Core.ValueObjects;
 using Hugin.Network;
 using Hugin.Protocol;
 using Hugin.Protocol.Commands;
 using Hugin.Security;
+using Hugin.Server.Api.Controllers;
 using Hugin.Server.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -30,6 +32,7 @@ public sealed class IrcServerService : BackgroundService
     private readonly TlsConfiguration _tlsConfig;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<IrcServerService> _logger;
+    private readonly IrcMetrics? _metrics;
     private readonly List<Network.TcpListener> _listeners = new();
     private readonly ServerId _serverId;
     private readonly DateTimeOffset _startTime;
@@ -48,6 +51,7 @@ public sealed class IrcServerService : BackgroundService
     /// <param name="tlsConfig">TLS configuration for secure connections.</param>
     /// <param name="serviceProvider">Service provider for dependency resolution.</param>
     /// <param name="logger">Logger instance.</param>
+    /// <param name="metrics">IRC metrics for statistics (optional).</param>
     public IrcServerService(
         IOptions<HuginConfiguration> config,
         IUserRepository users,
@@ -59,7 +63,8 @@ public sealed class IrcServerService : BackgroundService
         HostCloaker cloaker,
         TlsConfiguration tlsConfig,
         IServiceProvider serviceProvider,
-        ILogger<IrcServerService> logger)
+        ILogger<IrcServerService> logger,
+        IrcMetrics? metrics = null)
     {
         _config = config.Value;
         _users = users;
@@ -72,6 +77,7 @@ public sealed class IrcServerService : BackgroundService
         _tlsConfig = tlsConfig;
         _serviceProvider = serviceProvider;
         _logger = logger;
+        _metrics = metrics;
 
         _serverId = ServerId.Create(_config.Server.Sid, _config.Server.Name);
         _startTime = DateTimeOffset.UtcNow;
@@ -188,6 +194,10 @@ public sealed class IrcServerService : BackgroundService
 
     private async ValueTask ProcessLineAsync(ClientConnection connection, User user, CapabilityManager caps, string line)
     {
+        // Record message for statistics
+        ServerStatusService.RecordMessage();
+        _metrics?.MessageReceived("RAW", line.Length);
+
         // Redact AUTHENTICATE payloads to prevent credential leakage in logs
         var logLine = line.StartsWith("AUTHENTICATE ", StringComparison.OrdinalIgnoreCase) && line.Length > 13
             ? "AUTHENTICATE <redacted>"
@@ -310,6 +320,13 @@ public sealed class IrcServerService : BackgroundService
         // MOTD
         await SendMotd(connection, nick);
 
+        // Broadcast connect event to admin clients
+        var userEventNotifier = _serviceProvider.GetService<Core.Interfaces.IUserEventNotifier>();
+        if (userEventNotifier is not null)
+        {
+            await userEventNotifier.OnUserConnectedAsync(nick, user.DisplayedHostname, user.ConnectionId.ToString(), default);
+        }
+
         _logger.LogInformation("User {Nick} ({Host}) registered from {Address}",
             nick, fullHost, connection.RemoteEndPoint);
     }
@@ -399,7 +416,6 @@ public sealed class IrcServerService : BackgroundService
             if (channel is not null)
             {
                 channel.RemoveMember(user.ConnectionId);
-                _connectionManager.PartChannel(user.ConnectionId, channelName.Value);
 
                 if (channel.IsEmpty)
                 {

@@ -7,10 +7,34 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Hugin.Server.Api.Auth;
+
+/// <summary>
+/// Cached JSON serializer options for admin user serialization.
+/// </summary>
+internal static class JwtJsonOptions
+{
+    /// <summary>
+    /// Options for reading admin users (case-insensitive).
+    /// </summary>
+    public static readonly JsonSerializerOptions ReadOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    /// <summary>
+    /// Options for writing admin users (indented, camelCase).
+    /// </summary>
+    public static readonly JsonSerializerOptions WriteOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+}
 
 /// <summary>
 /// Configuration for JWT authentication.
@@ -300,12 +324,13 @@ public interface IAdminUserService
 }
 
 /// <summary>
-/// In-memory admin user service (for initial setup, later persisted to database).
+/// Persistent admin user service that stores users to a JSON file.
 /// </summary>
 public sealed class AdminUserService : IAdminUserService
 {
     private readonly List<AdminUser> _users = new();
     private readonly ILogger<AdminUserService> _logger;
+    private readonly string _usersFilePath;
     private readonly object _lock = new();
 
     /// <summary>
@@ -314,6 +339,54 @@ public sealed class AdminUserService : IAdminUserService
     public AdminUserService(ILogger<AdminUserService> logger)
     {
         _logger = logger;
+        _usersFilePath = Path.Combine(AppContext.BaseDirectory, "admin-users.json");
+        LoadUsersFromFile();
+    }
+
+    /// <summary>
+    /// Loads admin users from the JSON file.
+    /// </summary>
+    private void LoadUsersFromFile()
+    {
+        try
+        {
+            if (File.Exists(_usersFilePath))
+            {
+                var json = File.ReadAllText(_usersFilePath);
+                var users = JsonSerializer.Deserialize<List<AdminUser>>(json, JwtJsonOptions.ReadOptions);
+                
+                if (users != null)
+                {
+                    _users.AddRange(users);
+                    _logger.LogInformation("Loaded {Count} admin user(s) from {Path}", _users.Count, _usersFilePath);
+                }
+            }
+            else
+            {
+                _logger.LogInformation("No admin users file found at {Path}, starting fresh", _usersFilePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load admin users from {Path}", _usersFilePath);
+        }
+    }
+
+    /// <summary>
+    /// Saves admin users to the JSON file.
+    /// </summary>
+    private void SaveUsersToFile()
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(_users, JwtJsonOptions.WriteOptions);
+            File.WriteAllText(_usersFilePath, json);
+            _logger.LogDebug("Saved {Count} admin user(s) to {Path}", _users.Count, _usersFilePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save admin users to {Path}", _usersFilePath);
+        }
     }
 
     /// <inheritdoc />
@@ -378,6 +451,7 @@ public sealed class AdminUserService : IAdminUserService
             };
 
             _users.Add(user);
+            SaveUsersToFile();
             _logger.LogInformation("Created admin user: {Username}", username);
 
             return Task.FromResult(user);
@@ -410,6 +484,7 @@ public sealed class AdminUserService : IAdminUserService
                 IsEnabled = user.IsEnabled
             };
 
+            SaveUsersToFile();
             _logger.LogInformation("Updated password for user: {Username}", user.Username);
         }
 

@@ -3,6 +3,7 @@
 // Licensed under the MIT License
 
 using System.Diagnostics;
+using Hugin.Core.Metrics;
 using Hugin.Server.Api.Controllers;
 using Hugin.Server.Api.Models;
 
@@ -56,6 +57,7 @@ public sealed class StatsBackgroundService : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var hubService = scope.ServiceProvider.GetService<IAdminHubService>();
         var statusService = scope.ServiceProvider.GetService<IServerStatusService>();
+        var metrics = scope.ServiceProvider.GetService<IrcMetrics>();
 
         if (hubService == null || statusService == null)
         {
@@ -71,28 +73,16 @@ public sealed class StatsBackgroundService : BackgroundService
             ConnectedUsers = status.ConnectedUsers,
             ChannelCount = status.ChannelCount,
             OperatorsOnline = status.OperatorsOnline,
-            MessagesPerSecond = CalculateMessagesPerSecond(),
-            BytesInPerSecond = CalculateBytesPerSecond(true),
-            BytesOutPerSecond = CalculateBytesPerSecond(false),
+            MessagesPerSecond = metrics?.GetMessagesPerSecond() ?? 0,
+            BytesInPerSecond = metrics?.GetBytesPerSecond(true) ?? 0,
+            BytesOutPerSecond = metrics?.GetBytesPerSecond(false) ?? 0,
             MemoryUsageMb = _currentProcess.WorkingSet64 / (1024.0 * 1024.0),
             CpuUsagePercent = GetCpuUsage(),
             ActiveConnections = status.ConnectedUsers,
-            PendingOperations = GetPendingOperations()
+            PendingOperations = metrics?.GetPendingOperations() ?? 0
         };
 
         await hubService.BroadcastStatsAsync(stats, cancellationToken);
-    }
-
-    private static double CalculateMessagesPerSecond()
-    {
-        // TODO: Integrate with actual message counter
-        return 0;
-    }
-
-    private static double CalculateBytesPerSecond(bool incoming)
-    {
-        // TODO: Integrate with actual network counters
-        return 0;
     }
 
     private double GetCpuUsage()
@@ -107,11 +97,5 @@ public sealed class StatsBackgroundService : BackgroundService
         {
             return 0;
         }
-    }
-
-    private static int GetPendingOperations()
-    {
-        // TODO: Integrate with actual operation queue
-        return 0;
     }
 }

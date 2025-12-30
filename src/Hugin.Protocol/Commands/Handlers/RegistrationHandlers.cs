@@ -83,6 +83,13 @@ public sealed class NickHandler : CommandHandlerBase
                 var channel = context.Channels.GetByName(channelName);
                 channel?.UpdateMemberNickname(context.User.ConnectionId, nickname);
             }
+
+            // Broadcast nick change event to admin clients
+            var userEventNotifier = context.ServiceProvider(typeof(Core.Interfaces.IUserEventNotifier)) as Core.Interfaces.IUserEventNotifier;
+            if (userEventNotifier is not null && oldNick is not null)
+            {
+                await userEventNotifier.OnNickChangeAsync(oldNick, newNick, context.User.DisplayedHostname, context.User.ConnectionId.ToString(), cancellationToken);
+            }
         }
     }
 }
@@ -185,6 +192,18 @@ public sealed class QuitHandler : CommandHandlerBase
 
         // Remove user
         context.Users.Remove(context.User.ConnectionId);
+
+        // Broadcast disconnect event to admin clients
+        var userEventNotifier = context.ServiceProvider(typeof(Core.Interfaces.IUserEventNotifier)) as Core.Interfaces.IUserEventNotifier;
+        if (userEventNotifier is not null)
+        {
+            await userEventNotifier.OnUserDisconnectedAsync(
+                context.User.Nickname?.Value ?? "unknown", 
+                context.User.DisplayedHostname, 
+                reason, 
+                context.User.ConnectionId.ToString(), 
+                cancellationToken);
+        }
 
         // Close connection
         await context.Connection.CloseAsync(cancellationToken);

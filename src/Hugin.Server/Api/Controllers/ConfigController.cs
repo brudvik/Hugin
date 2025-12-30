@@ -2,12 +2,35 @@
 // Copyright (c) 2024 Hugin Contributors
 // Licensed under the MIT License
 
+using System.Text.Json;
 using Hugin.Server.Api.Auth;
 using Hugin.Server.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Hugin.Server.Api.Controllers;
+
+/// <summary>
+/// Cached JSON serializer options for configuration serialization.
+/// </summary>
+internal static class ConfigJsonOptions
+{
+    /// <summary>
+    /// Options for reading configuration (case-insensitive).
+    /// </summary>
+    public static readonly JsonSerializerOptions ReadOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    /// <summary>
+    /// Options for writing configuration (indented).
+    /// </summary>
+    public static readonly JsonSerializerOptions WriteOptions = new()
+    {
+        WriteIndented = true
+    };
+}
 
 /// <summary>
 /// Server configuration management endpoints.
@@ -85,7 +108,52 @@ public sealed class ConfigController : ControllerBase
 
         try
         {
-            // TODO: Persist configuration changes
+            // Read current appsettings.json
+            var appSettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+            if (!System.IO.File.Exists(appSettingsPath))
+            {
+                return BadRequest(ApiResponse.Fail("Configuration file not found"));
+            }
+
+            var json = await System.IO.File.ReadAllTextAsync(appSettingsPath, cancellationToken);
+            using var doc = JsonDocument.Parse(json);
+            
+            // Create a dictionary to modify
+            var root = JsonSerializer.Deserialize<Dictionary<string, object>>(json, ConfigJsonOptions.ReadOptions) ?? new();
+
+            // Update Hugin section
+            var huginSection = new Dictionary<string, object>
+            {
+                ["Server"] = new Dictionary<string, object>
+                {
+                    ["Name"] = config.ServerName,
+                    ["NetworkName"] = config.NetworkName,
+                    ["Description"] = config.Description ?? "",
+                    ["AdminEmail"] = config.AdminEmail ?? ""
+                },
+                ["Limits"] = new Dictionary<string, object>
+                {
+                    ["MaxUsers"] = config.MaxUsers,
+                    ["MaxChannelsPerUser"] = config.MaxChannelsPerUser,
+                    ["MaxNickLength"] = config.MaxNickLength,
+                    ["MaxChannelLength"] = config.MaxChannelLength,
+                    ["MaxTopicLength"] = config.MaxTopicLength
+                },
+                ["Ports"] = new Dictionary<string, object>
+                {
+                    ["Tls"] = config.Ports?.TlsPort ?? 6697,
+                    ["WebSocket"] = config.Ports?.WebSocketPort ?? 8443,
+                    ["Admin"] = config.Ports?.AdminPort ?? 9443,
+                    ["Plaintext"] = config.Ports?.PlaintextPort ?? 0
+                }
+            };
+
+            root["Hugin"] = huginSection;
+
+            // Write back
+            var updatedJson = JsonSerializer.Serialize(root, ConfigJsonOptions.WriteOptions);
+            await System.IO.File.WriteAllTextAsync(appSettingsPath, updatedJson, cancellationToken);
+
             _logger.LogInformation("Configuration updated by {User}", User.Identity?.Name);
 
             return Ok(ApiResponse.Ok("Configuration updated. Some changes may require a server restart."));
@@ -121,11 +189,58 @@ public sealed class ConfigController : ControllerBase
     /// </summary>
     [HttpPut("ratelimits")]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
-    public IActionResult UpdateRateLimits([FromBody] RateLimitConfigDto config)
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdateRateLimits([FromBody] RateLimitConfigDto config, CancellationToken cancellationToken)
     {
-        // TODO: Persist rate limit changes
-        _logger.LogInformation("Rate limits updated by {User}", User.Identity?.Name);
-        return Ok(ApiResponse.Ok("Rate limits updated"));
+        try
+        {
+            // Read current appsettings.json
+            var appSettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+            if (!System.IO.File.Exists(appSettingsPath))
+            {
+                return BadRequest(ApiResponse.Fail("Configuration file not found"));
+            }
+
+            var json = await System.IO.File.ReadAllTextAsync(appSettingsPath, cancellationToken);
+            var root = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(json) ?? new();
+
+            // Update rate limits section
+            var rateLimits = new Dictionary<string, int>
+            {
+                ["ConnectionsPerMinute"] = config.ConnectionsPerMinute,
+                ["MessagesPerSecond"] = config.MessagesPerSecond,
+                ["JoinsPerMinute"] = config.JoinsPerMinute,
+                ["NickChangesPerMinute"] = config.NickChangesPerMinute,
+                ["PrivmsgsPerSecond"] = config.PrivmsgsPerSecond
+            };
+
+            // Parse existing Hugin section and update
+            if (root.TryGetValue("Hugin", out var huginElement))
+            {
+                var hugin = JsonSerializer.Deserialize<Dictionary<string, object>>(huginElement.GetRawText()) ?? new();
+                hugin["RateLimits"] = rateLimits;
+                
+                var newRoot = new Dictionary<string, object>(root.Count);
+                foreach (var kvp in root)
+                {
+                    if (kvp.Key == "Hugin")
+                        newRoot[kvp.Key] = hugin;
+                    else
+                        newRoot[kvp.Key] = kvp.Value;
+                }
+
+                var updatedJson = JsonSerializer.Serialize(newRoot, ConfigJsonOptions.WriteOptions);
+                await System.IO.File.WriteAllTextAsync(appSettingsPath, updatedJson, cancellationToken);
+            }
+
+            _logger.LogInformation("Rate limits updated by {User}", User.Identity?.Name);
+            return Ok(ApiResponse.Ok("Rate limits updated"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update rate limits");
+            return BadRequest(ApiResponse.Fail(ex.Message));
+        }
     }
 
     /// <summary>

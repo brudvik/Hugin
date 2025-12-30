@@ -49,6 +49,7 @@ public static class WebApiExtensions
         // Register SignalR services
         services.AddSingleton<SignalRSerilogSink>();
         services.AddSingleton<IAdminHubService, AdminHubService>();
+        services.AddSingleton<Core.Interfaces.IUserEventNotifier, Services.SignalRUserEventNotifier>();
         services.AddHostedService<StatsBackgroundService>();
 
         // Add controllers
@@ -182,7 +183,7 @@ public static class WebApiExtensions
             });
         }
 
-        // Serve static files (Angular app)
+        // Serve static files (Angular app / fallback UI)
         app.UseDefaultFiles();
         app.UseStaticFiles();
 
@@ -195,6 +196,133 @@ public static class WebApiExtensions
 
         // Map SignalR hub
         app.MapHub<AdminHub>("/api/hubs/admin");
+
+        // Route specific admin pages to their HTML files
+        app.MapGet("/admin/setup", async context =>
+        {
+            context.Response.ContentType = "text/html";
+            var path = Path.Combine(app.Environment.WebRootPath ?? "wwwroot", "index.html");
+            if (File.Exists(path))
+            {
+                await context.Response.SendFileAsync(path);
+            }
+            else
+            {
+                context.Response.StatusCode = 404;
+                await context.Response.WriteAsync("Setup page not found. Please build the admin UI.");
+            }
+        });
+
+        app.MapGet("/admin/login", async context =>
+        {
+            context.Response.ContentType = "text/html";
+            var path = Path.Combine(app.Environment.WebRootPath ?? "wwwroot", "admin", "login.html");
+            if (File.Exists(path))
+            {
+                await context.Response.SendFileAsync(path);
+            }
+            else
+            {
+                context.Response.StatusCode = 404;
+                await context.Response.WriteAsync("Login page not found.");
+            }
+        });
+
+        app.MapGet("/admin/dashboard", async context =>
+        {
+            context.Response.ContentType = "text/html";
+            var path = Path.Combine(app.Environment.WebRootPath ?? "wwwroot", "admin", "dashboard.html");
+            if (File.Exists(path))
+            {
+                await context.Response.SendFileAsync(path);
+            }
+            else
+            {
+                context.Response.StatusCode = 404;
+                await context.Response.WriteAsync("Dashboard not found.");
+            }
+        });
+
+        app.MapGet("/admin/users", async context =>
+        {
+            context.Response.ContentType = "text/html";
+            var path = Path.Combine(app.Environment.WebRootPath ?? "wwwroot", "admin", "users.html");
+            if (File.Exists(path))
+            {
+                await context.Response.SendFileAsync(path);
+            }
+            else
+            {
+                context.Response.StatusCode = 404;
+                await context.Response.WriteAsync("Users page not found.");
+            }
+        });
+
+        app.MapGet("/admin/channels", async context =>
+        {
+            context.Response.ContentType = "text/html";
+            var path = Path.Combine(app.Environment.WebRootPath ?? "wwwroot", "admin", "channels.html");
+            if (File.Exists(path))
+            {
+                await context.Response.SendFileAsync(path);
+            }
+            else
+            {
+                context.Response.StatusCode = 404;
+                await context.Response.WriteAsync("Channels page not found.");
+            }
+        });
+
+        app.MapGet("/admin/operators", async context =>
+        {
+            context.Response.ContentType = "text/html";
+            var path = Path.Combine(app.Environment.WebRootPath ?? "wwwroot", "admin", "operators.html");
+            if (File.Exists(path))
+            {
+                await context.Response.SendFileAsync(path);
+            }
+            else
+            {
+                context.Response.StatusCode = 404;
+                await context.Response.WriteAsync("Operators page not found.");
+            }
+        });
+
+        app.MapGet("/admin/config", async context =>
+        {
+            context.Response.ContentType = "text/html";
+            var path = Path.Combine(app.Environment.WebRootPath ?? "wwwroot", "admin", "config.html");
+            if (File.Exists(path))
+            {
+                await context.Response.SendFileAsync(path);
+            }
+            else
+            {
+                context.Response.StatusCode = 404;
+                await context.Response.WriteAsync("Configuration page not found.");
+            }
+        });
+
+        app.MapGet("/admin/logs", async context =>
+        {
+            context.Response.ContentType = "text/html";
+            var path = Path.Combine(app.Environment.WebRootPath ?? "wwwroot", "admin", "logs.html");
+            if (File.Exists(path))
+            {
+                await context.Response.SendFileAsync(path);
+            }
+            else
+            {
+                context.Response.StatusCode = 404;
+                await context.Response.WriteAsync("Logs page not found.");
+            }
+        });
+
+        // Catch-all for other /admin/* routes - redirect to dashboard
+        app.MapGet("/admin/{*path}", async context =>
+        {
+            context.Response.Redirect("/admin/dashboard");
+        });
 
         // SPA fallback for client-side routing
         app.MapFallbackToFile("index.html");

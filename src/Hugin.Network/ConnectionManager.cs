@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Text;
 using Hugin.Core.Interfaces;
+using Hugin.Core.ValueObjects;
+using Hugin.Network.S2S;
 using Microsoft.Extensions.Logging;
 
 namespace Hugin.Network;
@@ -11,9 +13,7 @@ namespace Hugin.Network;
 public sealed class ConnectionManager : IConnectionManager
 {
     private readonly ConcurrentDictionary<Guid, ClientConnection> _connections = new();
-    private readonly ConcurrentDictionary<string, HashSet<Guid>> _channelMembers = new();
     private readonly ILogger<ConnectionManager> _logger;
-    private readonly object _channelLock = new();
 
     /// <summary>
     /// Creates a new connection manager.
@@ -38,14 +38,6 @@ public sealed class ConnectionManager : IConnectionManager
     {
         if (_connections.TryRemove(connectionId, out _))
         {
-            // Remove from all channels
-            lock (_channelLock)
-            {
-                foreach (var members in _channelMembers.Values)
-                {
-                    members.Remove(connectionId);
-                }
-            }
             _logger.LogDebug("Unregistered connection {ConnectionId}", connectionId);
         }
     }
@@ -65,54 +57,18 @@ public sealed class ConnectionManager : IConnectionManager
         return _connections.Count;
     }
 
+    /// <summary>
+    /// Gets connections for a channel by looking up members in the channel repository.
+    /// </summary>
+    /// <remarks>
+    /// This implementation requires a channel reference. For message routing, use
+    /// <see cref="IMessageBroker.SendToChannelAsync"/> which handles this internally.
+    /// </remarks>
     public IEnumerable<IClientConnection> GetChannelConnections(string channelName)
     {
-        lock (_channelLock)
-        {
-            if (_channelMembers.TryGetValue(channelName, out var members))
-            {
-                return members
-                    .Select(id => _connections.GetValueOrDefault(id))
-                    .Where(c => c is not null)
-                    .Cast<IClientConnection>()
-                    .ToList();
-            }
-        }
+        // This method is kept for interface compliance but channel message routing
+        // is now handled by MessageBroker using IChannelRepository
         return Enumerable.Empty<IClientConnection>();
-    }
-
-    /// <summary>
-    /// Adds a connection to a channel.
-    /// </summary>
-    public void JoinChannel(Guid connectionId, string channelName)
-    {
-        lock (_channelLock)
-        {
-            if (!_channelMembers.TryGetValue(channelName, out var members))
-            {
-                members = new HashSet<Guid>();
-                _channelMembers[channelName] = members;
-            }
-            members.Add(connectionId);
-        }
-    }
-
-    /// <summary>
-    /// Removes a connection from a channel.
-    /// </summary>
-    public void PartChannel(Guid connectionId, string channelName)
-    {
-        lock (_channelLock)
-        {
-            if (_channelMembers.TryGetValue(channelName, out var members))
-            {
-                members.Remove(connectionId);
-                if (members.Count == 0)
-                {
-                    _channelMembers.TryRemove(channelName, out _);
-                }
-            }
-        }
     }
 
     public async ValueTask CloseConnectionAsync(Guid connectionId, string reason, CancellationToken cancellationToken = default)
@@ -141,17 +97,31 @@ public sealed class ConnectionManager : IConnectionManager
 public sealed class MessageBroker : IMessageBroker
 {
     private readonly ConnectionManager _connectionManager;
+    private readonly IChannelRepository _channelRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly IS2SConnectionManager? _s2sConnectionManager;
     private readonly ILogger<MessageBroker> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MessageBroker"/> class.
     /// </summary>
     /// <param name="connectionManager">The connection manager.</param>
+    /// <param name="channelRepository">The channel repository.</param>
+    /// <param name="userRepository">The user repository.</param>
     /// <param name="logger">The logger instance.</param>
-    public MessageBroker(ConnectionManager connectionManager, ILogger<MessageBroker> logger)
+    /// <param name="s2sConnectionManager">The S2S connection manager (optional).</param>
+    public MessageBroker(
+        ConnectionManager connectionManager, 
+        IChannelRepository channelRepository, 
+        IUserRepository userRepository,
+        ILogger<MessageBroker> logger,
+        IS2SConnectionManager? s2sConnectionManager = null)
     {
         _connectionManager = connectionManager;
+        _channelRepository = channelRepository;
+        _userRepository = userRepository;
         _logger = logger;
+        _s2sConnectionManager = s2sConnectionManager;
     }
 
     /// <summary>
@@ -206,18 +176,31 @@ public sealed class MessageBroker : IMessageBroker
     /// <param name="cancellationToken">Cancellation token.</param>
     public async ValueTask SendToChannelAsync(string channelName, string message, Guid? exceptConnectionId = null, CancellationToken cancellationToken = default)
     {
+        // Try to parse channel name and look up in repository
+        if (!ChannelName.TryCreate(channelName, out var parsedName, out _))
+        {
+            _logger.LogWarning("Invalid channel name: {ChannelName}", channelName);
+            return;
+        }
+
+        var channel = _channelRepository.GetByName(parsedName);
+        if (channel is null)
+        {
+            _logger.LogDebug("Channel not found: {ChannelName}", channelName);
+            return;
+        }
+
         var data = Encoding.UTF8.GetBytes(message + "\r\n");
-        var connections = _connectionManager.GetChannelConnections(channelName);
         var tasks = new List<Task>();
 
-        foreach (var connection in connections)
+        foreach (var member in channel.Members.Values)
         {
-            if (exceptConnectionId.HasValue && connection.ConnectionId == exceptConnectionId.Value)
+            if (exceptConnectionId.HasValue && member.ConnectionId == exceptConnectionId.Value)
             {
                 continue;
             }
 
-            if (connection is ClientConnection clientConnection)
+            if (_connectionManager.GetConnection(member.ConnectionId) is ClientConnection clientConnection)
             {
                 tasks.Add(SendSafeAsync(clientConnection, data, cancellationToken));
             }
@@ -241,20 +224,31 @@ public sealed class MessageBroker : IMessageBroker
 
         foreach (var channelName in channelNames)
         {
-            foreach (var connection in _connectionManager.GetChannelConnections(channelName))
+            if (!ChannelName.TryCreate(channelName, out var parsedName, out _))
             {
-                if (exceptConnectionId.HasValue && connection.ConnectionId == exceptConnectionId.Value)
+                continue;
+            }
+
+            var channel = _channelRepository.GetByName(parsedName);
+            if (channel is null)
+            {
+                continue;
+            }
+
+            foreach (var member in channel.Members.Values)
+            {
+                if (exceptConnectionId.HasValue && member.ConnectionId == exceptConnectionId.Value)
                 {
                     continue;
                 }
 
                 // Deduplicate
-                if (!sentTo.Add(connection.ConnectionId))
+                if (!sentTo.Add(member.ConnectionId))
                 {
                     continue;
                 }
 
-                if (connection is ClientConnection clientConnection)
+                if (_connectionManager.GetConnection(member.ConnectionId) is ClientConnection clientConnection)
                 {
                     tasks.Add(SendSafeAsync(clientConnection, data, cancellationToken));
                 }
@@ -292,14 +286,15 @@ public sealed class MessageBroker : IMessageBroker
     /// <param name="cancellationToken">Cancellation token.</param>
     public async ValueTask SendToOperatorsAsync(string message, CancellationToken cancellationToken = default)
     {
-        // TODO: Filter by operator status
         var data = Encoding.UTF8.GetBytes(message + "\r\n");
         var tasks = new List<Task>();
 
-        foreach (var connection in _connectionManager.GetAllConnections())
+        // Get all operators from user repository
+        var operators = _userRepository.GetAll().Where(u => u.IsOperator);
+        
+        foreach (var oper in operators)
         {
-            // Would need access to user repository to check operator status
-            if (connection is ClientConnection clientConnection)
+            if (_connectionManager.GetConnection(oper.ConnectionId) is ClientConnection clientConnection)
             {
                 tasks.Add(SendSafeAsync(clientConnection, data, cancellationToken));
             }
@@ -311,14 +306,43 @@ public sealed class MessageBroker : IMessageBroker
     /// <summary>
     /// Sends a message to a linked server (server-to-server communication).
     /// </summary>
-    /// <param name="serverId">The target server identifier.</param>
+    /// <param name="serverId">The target server identifier (SID or server name).</param>
     /// <param name="message">The IRC message to send.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <remarks>This method is not yet implemented pending S2S protocol support.</remarks>
     public async ValueTask SendToServerAsync(string serverId, string message, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement S2S routing
-        await Task.CompletedTask;
+        if (_s2sConnectionManager == null)
+        {
+            _logger.LogDebug("S2S not available, cannot route message to server {ServerId}", serverId);
+            return;
+        }
+
+        // Find connection by SID or server name by iterating all connections
+        IS2SConnection? connection = null;
+        foreach (var conn in _s2sConnectionManager.GetAllConnections())
+        {
+            if (conn.RemoteServerId?.Sid.Equals(serverId, StringComparison.OrdinalIgnoreCase) == true ||
+                conn.RemoteServerId?.Name.Equals(serverId, StringComparison.OrdinalIgnoreCase) == true)
+            {
+                connection = conn;
+                break;
+            }
+        }
+
+        if (connection == null)
+        {
+            _logger.LogWarning("No S2S connection found for server {ServerId}", serverId);
+            return;
+        }
+
+        try
+        {
+            await _s2sConnectionManager.SendToConnectionAsync(connection.ConnectionId, message, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send S2S message to {ServerId}", serverId);
+        }
     }
 
     /// <summary>

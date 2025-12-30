@@ -14,6 +14,11 @@ public sealed class HuginDbContext : DbContext
     public DbSet<StoredMessageEntity> Messages => Set<StoredMessageEntity>();
     public DbSet<ChannelRegistrationEntity> RegisteredChannels => Set<ChannelRegistrationEntity>();
     public DbSet<ServerLinkEntity> ServerLinks => Set<ServerLinkEntity>();
+    public DbSet<ServerBanEntity> ServerBans => Set<ServerBanEntity>();
+    public DbSet<MemoEntity> Memos => Set<MemoEntity>();
+    public DbSet<BotEntity> Bots => Set<BotEntity>();
+    public DbSet<ChannelBotEntity> ChannelBots => Set<ChannelBotEntity>();
+    public DbSet<VirtualHostEntity> VirtualHosts => Set<VirtualHostEntity>();
 
     public HuginDbContext(DbContextOptions<HuginDbContext> options) : base(options)
     {
@@ -113,8 +118,12 @@ public sealed class HuginDbContext : DbContext
             entity.Property(e => e.Key).HasColumnName("key").HasMaxLength(50);
             entity.Property(e => e.RegisteredAt).HasColumnName("registered_at");
             entity.Property(e => e.LastUsedAt).HasColumnName("last_used_at");
+            entity.Property(e => e.KeepTopic).HasColumnName("keep_topic").HasDefaultValue(true);
+            entity.Property(e => e.Secure).HasColumnName("secure").HasDefaultValue(false);
+            entity.Property(e => e.SuccessorId).HasColumnName("successor_id");
 
             entity.HasIndex(e => e.Name).IsUnique();
+            entity.HasIndex(e => e.FounderId);
         });
 
         // Server Links
@@ -141,6 +150,101 @@ public sealed class HuginDbContext : DbContext
 
             entity.HasIndex(e => e.Name).IsUnique();
             entity.HasIndex(e => e.Sid).IsUnique();
+        });
+
+        modelBuilder.Entity<ServerBanEntity>(entity =>
+        {
+            entity.ToTable("server_bans");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.BanType).HasColumnName("ban_type");
+            entity.Property(e => e.Pattern).HasColumnName("pattern").HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Reason).HasColumnName("reason").HasMaxLength(500).IsRequired();
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.Property(e => e.ExpiresAt).HasColumnName("expires_at");
+            entity.Property(e => e.SetBy).HasColumnName("set_by").HasMaxLength(255).IsRequired();
+
+            entity.HasIndex(e => e.Pattern);
+            entity.HasIndex(e => e.BanType);
+            entity.HasIndex(e => e.ExpiresAt);
+        });
+
+        modelBuilder.Entity<MemoEntity>(entity =>
+        {
+            entity.ToTable("memos");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.SenderId).HasColumnName("sender_id");
+            entity.Property(e => e.SenderNickname).HasColumnName("sender_nickname").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.RecipientId).HasColumnName("recipient_id");
+            entity.Property(e => e.Text).HasColumnName("text").HasMaxLength(1000).IsRequired();
+            entity.Property(e => e.SentAt).HasColumnName("sent_at");
+            entity.Property(e => e.ReadAt).HasColumnName("read_at");
+
+            entity.HasIndex(e => e.RecipientId);
+            entity.HasIndex(e => e.SenderId);
+            entity.HasIndex(e => new { e.RecipientId, e.ReadAt });
+        });
+
+        // Bots
+        modelBuilder.Entity<BotEntity>(entity =>
+        {
+            entity.ToTable("bots");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Nickname).HasColumnName("nickname").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Ident).HasColumnName("ident").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Realname).HasColumnName("realname").HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Host).HasColumnName("host").HasMaxLength(255).HasDefaultValue("services.bot");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.Property(e => e.Uid).HasColumnName("uid").HasMaxLength(9).IsRequired();
+            entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+
+            entity.HasIndex(e => e.Nickname).IsUnique();
+            entity.HasIndex(e => e.Uid).IsUnique();
+        });
+
+        // Channel Bot Assignments
+        modelBuilder.Entity<ChannelBotEntity>(entity =>
+        {
+            entity.ToTable("channel_bots");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.BotId).HasColumnName("bot_id");
+            entity.Property(e => e.ChannelName).HasColumnName("channel_name").HasMaxLength(200).IsRequired();
+            entity.Property(e => e.AssignedBy).HasColumnName("assigned_by");
+            entity.Property(e => e.AssignedAt).HasColumnName("assigned_at");
+            entity.Property(e => e.GreetMessage).HasColumnName("greet_message").HasMaxLength(500);
+            entity.Property(e => e.AutoGreet).HasColumnName("auto_greet").HasDefaultValue(false);
+
+            entity.HasIndex(e => e.BotId);
+            entity.HasIndex(e => e.ChannelName);
+            entity.HasIndex(e => new { e.BotId, e.ChannelName }).IsUnique();
+        });
+
+        // Virtual Hosts
+        modelBuilder.Entity<VirtualHostEntity>(entity =>
+        {
+            entity.ToTable("virtual_hosts");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AccountId).HasColumnName("account_id");
+            entity.Property(e => e.Hostname).HasColumnName("hostname").HasMaxLength(63).IsRequired();
+            entity.Property(e => e.RequestedAt).HasColumnName("requested_at");
+            entity.Property(e => e.ApprovedAt).HasColumnName("approved_at");
+            entity.Property(e => e.ApprovedBy).HasColumnName("approved_by").HasMaxLength(50);
+            entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(false);
+            entity.Property(e => e.Notes).HasColumnName("notes").HasMaxLength(500);
+
+            entity.HasIndex(e => e.AccountId);
+            entity.HasIndex(e => e.Hostname);
+            entity.HasIndex(e => new { e.AccountId, e.IsActive });
+            entity.HasIndex(e => e.ApprovedAt);
         });
     }
 }
@@ -355,4 +459,111 @@ public sealed class ChannelRegistrationEntity
     
     /// <summary>Gets or sets when the channel was last used.</summary>
     public DateTimeOffset LastUsedAt { get; set; }
+
+    /// <summary>Gets or sets whether to keep the topic when the channel becomes empty.</summary>
+    public bool KeepTopic { get; set; } = true;
+
+    /// <summary>Gets or sets whether only identified users can join.</summary>
+    public bool Secure { get; set; }
+
+    /// <summary>Gets or sets the successor account ID.</summary>
+    public Guid? SuccessorId { get; set; }
+
+    /// <summary>
+    /// Converts the entity to a domain object.
+    /// </summary>
+    public Hugin.Core.Entities.RegisteredChannel ToDomain() => new()
+    {
+        Id = Id,
+        Name = Name,
+        FounderId = FounderId,
+        Topic = Topic,
+        Modes = Modes,
+        Key = Key,
+        RegisteredAt = RegisteredAt,
+        LastUsedAt = LastUsedAt,
+        KeepTopic = KeepTopic,
+        Secure = Secure,
+        SuccessorId = SuccessorId
+    };
+}
+
+/// <summary>
+/// Database entity for a server ban (K-Line, G-Line, Z-Line, Jupe).
+/// </summary>
+public sealed class ServerBanEntity
+{
+    /// <summary>Gets or sets the unique identifier.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>Gets or sets the ban type (KLine=0, GLine=1, ZLine=2, Jupe=3).</summary>
+    public int BanType { get; set; }
+
+    /// <summary>Gets or sets the hostmask pattern.</summary>
+    public string Pattern { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the reason for the ban.</summary>
+    public string Reason { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets when the ban was created.</summary>
+    public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>Gets or sets when the ban expires (null for permanent).</summary>
+    public DateTimeOffset? ExpiresAt { get; set; }
+
+    /// <summary>Gets or sets who set the ban.</summary>
+    public string SetBy { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Converts the entity to a domain object.
+    /// </summary>
+    public Hugin.Core.Entities.ServerBan ToDomain() => new(
+        Id,
+        (Hugin.Core.Entities.BanType)BanType,
+        Pattern,
+        Reason,
+        SetBy,
+        CreatedAt,
+        ExpiresAt);
+}
+
+/// <summary>
+/// Database entity for a memo (offline message).
+/// </summary>
+public sealed class MemoEntity
+{
+    /// <summary>Gets or sets the unique identifier.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>Gets or sets the sender's account ID.</summary>
+    public Guid SenderId { get; set; }
+
+    /// <summary>Gets or sets the sender's nickname at time of sending.</summary>
+    public string SenderNickname { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the recipient's account ID.</summary>
+    public Guid RecipientId { get; set; }
+
+    /// <summary>Gets or sets the memo text.</summary>
+    public string Text { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets when the memo was sent.</summary>
+    public DateTimeOffset SentAt { get; set; }
+
+    /// <summary>Gets or sets when the memo was read (null if unread).</summary>
+    public DateTimeOffset? ReadAt { get; set; }
+
+    /// <summary>
+    /// Converts the entity to a domain object.
+    /// </summary>
+    public Hugin.Core.Entities.Memo ToDomain() => new(
+        Id,
+        SenderId,
+        SenderNickname,
+        RecipientId,
+        Text,
+        SentAt)
+    {
+        ReadAt = ReadAt
+    };
 }

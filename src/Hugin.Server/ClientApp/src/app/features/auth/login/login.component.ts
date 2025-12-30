@@ -14,7 +14,7 @@ import { AuthService } from '@core/services/auth.service';
       <div class="login-card">
         <div class="login-header">
           <div class="login-logo">
-            <i class="fas fa-crow"></i>
+            <img src="hugin-logo.png" alt="Hugin Logo" style="width: 64px; height: 64px;">
           </div>
           <h1>Hugin Admin</h1>
           <p class="text-muted">Logg inn for å administrere IRC-serveren</p>

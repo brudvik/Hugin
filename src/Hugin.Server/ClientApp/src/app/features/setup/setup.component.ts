@@ -24,7 +24,7 @@ interface StepInfo {
         <!-- Progress Header -->
         <div class="setup-header">
           <div class="setup-logo">
-            <i class="fas fa-crow"></i>
+            <img src="hugin-logo.png" alt="Hugin Logo" style="width: 64px; height: 64px;">
           </div>
           <h1>Hugin Oppsett</h1>
           <p class="text-muted">Konfigurer IRC-serveren din i noen enkle steg</p>

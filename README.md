@@ -1,75 +1,105 @@
-# 🐦 Hugin IRC Server
-
-[![Build Status](https://img.shields.io/github/actions/workflow/status/brudvik/hugin/build.yml?branch=main)](https://github.com/brudvik/hugin/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)](https://dotnet.microsoft.com/)
-
-A modern, security-focused IRC server written in C# that follows RFC and IRCv3 specifications.
+<div align="center">
+  <img src="resources/hugin-irc-server.png" alt="Hugin IRC Server" width="128" height="128">
+  <h1>🐦 Hugin IRC Server</h1>
+  <p>
+    <a href="https://github.com/brudvik/hugin/actions"><img src="https://img.shields.io/github/actions/workflow/status/brudvik/hugin/build.yml?branch=main" alt="Build Status"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+    <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-8.0-purple.svg" alt=".NET"></a>
+  </p>
+  <p>A modern, security-focused IRC server written in C# that follows RFC and IRCv3 specifications.</p>
+</div>
 
 *Named after Huginn, Odin’s raven of thought — ever-present, ever-listening, gathering every word spoken across the realms.*
+---
 
+## 📖 Documentation
+
+- 🚀 **[Installation Guide](INSTALL.md)** - Step-by-step setup instructions
+- ⚙️ **[Configuration Reference](docs/CONFIGURATION.md)** - Complete configuration options
+- 🎛️ **[Admin Panel Guide](docs/ADMIN_PANEL.md)** - Web interface documentation  
+- 🔗 **[Server Linking](docs/S2S_PROTOCOL.md)** - Multi-server networks
+- 📜 **[RFC Compliance](docs/RFC_COMPLIANCE.md)** - Supported IRC standards
+
+---
 ## ✨ Features
 
-- **Full RFC Compliance**: RFC 1459, RFC 2812, Modern IRC
-- **IRCv3 Support**: CAP negotiation, SASL, message-tags, batch, chathistory, and more
-- **Security First**: TLS 1.2/1.3, SASL authentication, encrypted configuration, Argon2id password hashing
-- **Scalable**: Designed for thousands of concurrent users
-- **Server Linking**: S2S protocol for multi-server networks
-- **Persistent Storage**: PostgreSQL backend for user accounts and channel history
-- **Extensible**: Lua scripting, JSON triggers, and C# plugins for custom functionality
+### Core Functionality
+- **Full RFC Compliance** - RFC 1459, RFC 2812, Modern IRC
+- **IRCv3 Extensions** - 20+ capabilities: SASL, message-tags, batch, chathistory, and more
+- **Security First** - Mandatory TLS 1.2/1.3, Argon2id hashing, encrypted configuration
+- **High Performance** - Async I/O with System.IO.Pipelines, thousands of concurrent users
+- **Persistent Storage** - PostgreSQL for accounts, channels, message history
 
-## 🎛️ Admin Panel
+### Network Services
+Built-in IRC services:
+- **NickServ** - Nickname registration and authentication
+- **ChanServ** - Channel registration and management  
+- **MemoServ** - Offline messaging system
+- **OperServ** - Network administration (AKILL, JUPE, etc.)
+- **BotServ** - Bot hosting with custom greetings
+- **HostServ** - Virtual host management
 
-Hugin includes a modern web-based admin panel for easy server management:
+### Administration
+- **Setup Wizard** - Guided 5-step initial configuration
+- **Dashboard** - Real-time statistics and monitoring
+- **User Management** - View, message, disconnect users
+- **Channel Management** - Create and configure channels
+- **Operator Management** - IRCop permissions
+- **Ban Management** - K-lines, G-lines, Z-lines with expiration
+- **Configuration Editor** - Live settings modification
 
-- **Setup Wizard**: Guided 5-step initial configuration
-- **Dashboard**: Real-time server statistics and status
-- **User Management**: View, message, and disconnect users
-- **Channel Management**: Create, edit, and delete channels
-- **Operator Management**: Configure IRCops with granular permissions
-- **Ban Management**: K-lines, G-lines, Z-lines with expiration
-- **Configuration Editor**: Server settings, rate limits, IRCv3 capabilities
+### Extensibility  
+- **Lua Scripting** - Event handlers and custom commands
+- **JSON Triggers** - Automated responses
+- **C# Plugins** - Full API access for integrations
 
-👉 **[Admin Panel Documentation](docs/ADMIN_PANEL.md)** — detailed setup and usage guide.
-
-## 📚 Related Projects
-
-- **[Munin](https://github.com/brudvik/munin)**: IRC client companion project
-
-## 📋 Requirements
-
-- .NET 8.0 or later
-- PostgreSQL 14 or later
-- Valid TLS certificate for production use
+### Related Projects
+- **[Munin](https://github.com/brudvik/munin)** - Modern IRC client companion
 
 ## 🚀 Quick Start
 
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/hugin.git
+### Prerequisites
+- .NET 8.0 SDK or later  
+- PostgreSQL 14 or later
+- Windows 10+, Linux, or macOS
+
+### Installation
+
+**📚 Detailed instructions**: See **[INSTALL.md](INSTALL.md)** for the complete step-by-step guide.
+
+**Quick setup (Windows)**:
+```powershell
+# 1. Clone repository
+git clone https://github.com/brudvik/hugin.git
 cd hugin
 
-# Build the solution
-dotnet build
+# 2. Create database
+psql -U postgres
+CREATE USER hugin WITH PASSWORD 'hugin';
+CREATE DATABASE hugin OWNER hugin;
+\q
 
-# Run the server (development mode)
+# 3. Run configuration script
+.\configure-server.ps1
+```
+
+The script builds, starts the server, and opens the admin panel at `https://localhost:9443/admin/setup`.
+
+**Manual setup (Linux/macOS)**:
+```bash
+dotnet build
 dotnet run --project src/Hugin.Server
 ```
 
-### Windows: Configuration Script
+### First Connection
 
-Use the included PowerShell script for easy first-time setup:
+Connect with any IRC client:
+- **Server**: `localhost` or your domain  
+- **Port**: `6697`
+- **TLS**: ✅ Required
+- **Accept self-signed cert**: ✅ For testing
 
-```powershell
-# Run the configuration script (builds, starts server, opens admin panel)
-.\configure-server.ps1
-
-# Skip build if already built
-.\configure-server.ps1 -NoBuild
-
-# Use custom admin port
-.\configure-server.ps1 -AdminPort 8443
-```
+Try **[Munin](https://github.com/brudvik/munin)**, the companion IRC client!
 
 ## ⚙️ Configuration
 
@@ -247,7 +277,7 @@ dotnet test
 dotnet test --collect:"XPlat Code Coverage"
 ```
 
-**Current Status**: 553 unit tests passing
+**Current Status**: ✅ 700 unit tests passing
 
 ## 📄 License
 

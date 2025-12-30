@@ -19,7 +19,7 @@ interface NavItem {
     <aside class="sidebar d-flex flex-column">
       <!-- Brand -->
       <div class="sidebar-brand">
-        <i class="fas fa-crow me-2"></i>
+        <img src="hugin-logo.png" alt="Hugin" style="width: 32px; height: 32px;" class="me-2">
         <span>Hugin</span>
       </div>
 

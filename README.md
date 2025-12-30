@@ -12,6 +12,8 @@
 *Named after Huginn, Odin’s raven of thought — ever-present, ever-listening, gathering every word spoken across the realms.*
 ---
 
+![Hugin IRC Server - Admin Dashboard](https://github.com/brudvik/Hugin/blob/main/resources/hugin-admin-dashboard.png)
+
 ## 📖 Documentation
 
 - 🚀 **[Installation Guide](INSTALL.md)** - Step-by-step setup instructions

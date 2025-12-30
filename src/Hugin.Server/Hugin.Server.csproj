@@ -53,14 +53,20 @@
   <Target Name="BuildAngularSpa" BeforeTargets="Build" AfterTargets="CopyAssetsToWwwroot" Condition="'$(BuildAngular)' == 'true'">
     <Message Importance="high" Text="Building Angular admin panel..." />
     
+    <!-- Determine npm command based on OS -->
+    <PropertyGroup>
+      <NpmCommand Condition="'$(OS)' == 'Windows_NT'">npm.cmd</NpmCommand>
+      <NpmCommand Condition="'$(OS)' != 'Windows_NT'">npm</NpmCommand>
+    </PropertyGroup>
+    
     <!-- Install npm packages if node_modules doesn't exist -->
     <Exec WorkingDirectory="$(SpaRoot)" 
-          Command="npm.cmd install" 
+          Command="$(NpmCommand) install" 
           Condition="!Exists('$(SpaRoot)node_modules')" />
     
     <!-- Build Angular app to wwwroot -->
     <Exec WorkingDirectory="$(SpaRoot)" 
-          Command="npm.cmd run build:prod" />
+          Command="$(NpmCommand) run build:prod" />
     
     <!-- Copy assets to browser folder after Angular build -->
     <Copy SourceFiles="..\..\resources\hugin-irc-server.ico" 

@@ -49,6 +49,7 @@ coverage*.xml
 # Build artifacts
 artifacts/
 publish/
+releases/
 
 # Windows
 Thumbs.db

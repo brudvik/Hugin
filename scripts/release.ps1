@@ -7,19 +7,28 @@
     packages it as a ZIP file, and manages old releases.
 
 .PARAMETER Major
-    Increment the major version number.
+    Increment the major version number (e.g., 1.0.0 -> 2.0.0).
 
 .PARAMETER Minor
-    Increment the minor version number.
+    Increment the minor version number (e.g., 1.0.0 -> 1.1.0).
 
 .PARAMETER Patch
-    Increment the patch version number (default).
+    Increment the patch version number (default) (e.g., 1.0.0 -> 1.0.1).
+
+.PARAMETER ReuseVersion
+    Use the current version without incrementing. Useful for rebuilds.
+
+.PARAMETER Version
+    Set a specific version number (e.g., "2.0.0"). Overrides auto-increment.
 
 .PARAMETER SkipTests
     Skip running tests before creating the release.
 
 .PARAMETER KeepDays
     Number of days to keep old releases. Default: 60
+
+.PARAMETER MinKeep
+    Minimum number of releases to always keep regardless of age. Default: 1
 
 .EXAMPLE
     .\release.ps1
@@ -28,14 +37,29 @@
 .EXAMPLE
     .\release.ps1 -Minor
     Creates a release with incremented minor version.
+
+.EXAMPLE
+    .\release.ps1 -ReuseVersion
+    Rebuilds the release with the current version (no increment).
+
+.EXAMPLE
+    .\release.ps1 -Version "2.0.0"
+    Creates a release with the specified version.
+
+.EXAMPLE
+    .\release.ps1 -Major -SkipTests
+    Creates a major version release, skipping tests.
 #>
 
 param(
     [switch]$Major,
     [switch]$Minor,
     [switch]$Patch,
+    [switch]$ReuseVersion,
+    [string]$Version,
     [switch]$SkipTests,
-    [int]$KeepDays = 60
+    [int]$KeepDays = 60,
+    [int]$MinKeep = 1
 )
 
 $ErrorActionPreference = "Stop"
@@ -63,34 +87,58 @@ if (-not (Test-Path $ReleasesDir)) {
 $currentVersion = $propsXml.Project.PropertyGroup.Version
 Write-Host "Current version: $currentVersion" -ForegroundColor Yellow
 
-# Parse version
-$versionParts = $currentVersion -split '\.'
-$majorVer = [int]$versionParts[0]
-$minorVer = [int]$versionParts[1]
-$patchVer = [int]$versionParts[2]
-
-# Increment version
-if ($Major) {
-    $majorVer++
-    $minorVer = 0
-    $patchVer = 0
-} elseif ($Minor) {
-    $minorVer++
-    $patchVer = 0
+# Determine the new version
+if ($Version) {
+    # User specified an explicit version
+    if ($Version -notmatch '^\d+\.\d+\.\d+$') {
+        Write-Host "Invalid version format: $Version. Expected format: X.Y.Z (e.g., 2.0.0)" -ForegroundColor Red
+        exit 1
+    }
+    $newVersion = $Version
+    Write-Host "Using specified version: $newVersion" -ForegroundColor Green
+} elseif ($ReuseVersion) {
+    # Reuse current version (rebuild without increment)
+    $newVersion = $currentVersion
+    Write-Host "Reusing current version: $newVersion" -ForegroundColor Green
 } else {
-    # Default to patch increment
-    $patchVer++
-}
+    # Parse and increment version
+    $versionParts = $currentVersion -split '\.'
+    $majorVer = [int]$versionParts[0]
+    $minorVer = [int]$versionParts[1]
+    $patchVer = [int]$versionParts[2]
 
-$newVersion = "$majorVer.$minorVer.$patchVer"
-Write-Host "New version: $newVersion" -ForegroundColor Green
+    # Increment version based on parameter
+    if ($Major) {
+        $majorVer++
+        $minorVer = 0
+        $patchVer = 0
+        Write-Host "Incrementing major version..." -ForegroundColor DarkGray
+    } elseif ($Minor) {
+        $minorVer++
+        $patchVer = 0
+        Write-Host "Incrementing minor version..." -ForegroundColor DarkGray
+    } else {
+        # Default to patch increment
+        $patchVer++
+        Write-Host "Incrementing patch version..." -ForegroundColor DarkGray
+    }
+
+    $newVersion = "$majorVer.$minorVer.$patchVer"
+    Write-Host "New version: $newVersion" -ForegroundColor Green
+}
 Write-Host ""
 
-# Update version in Directory.Build.props
+# Update version in Directory.Build.props (only if version changed)
 $propsContent = Get-Content $PropsFile -Raw
-$propsContent = $propsContent -replace "<Version>$currentVersion</Version>", "<Version>$newVersion</Version>"
-Set-Content $PropsFile -Value $propsContent -NoNewline
-Write-Host "Updated Directory.Build.props with version $newVersion" -ForegroundColor DarkGray
+if ($currentVersion -ne $newVersion) {
+    $propsContent = $propsContent -replace "<Version>$currentVersion</Version>", "<Version>$newVersion</Version>"
+    Set-Content $PropsFile -Value $propsContent -NoNewline
+    Write-Host "Updated Directory.Build.props with version $newVersion" -ForegroundColor DarkGray
+    $versionChanged = $true
+} else {
+    Write-Host "Version unchanged, rebuilding $currentVersion" -ForegroundColor DarkGray
+    $versionChanged = $false
+}
 
 # Run tests (unless skipped)
 if (-not $SkipTests) {
@@ -100,8 +148,10 @@ if (-not $SkipTests) {
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
         Write-Host "Tests FAILED! Reverting version change..." -ForegroundColor Red
-        $propsContent = $propsContent -replace "<Version>$newVersion</Version>", "<Version>$currentVersion</Version>"
-        Set-Content $PropsFile -Value $propsContent -NoNewline
+        if ($versionChanged) {
+            $propsContent = $propsContent -replace "<Version>$newVersion</Version>", "<Version>$currentVersion</Version>"
+            Set-Content $PropsFile -Value $propsContent -NoNewline
+        }
         exit 1
     }
     Write-Host "All tests passed!" -ForegroundColor Green
@@ -165,13 +215,13 @@ Write-Host ""
 # Clean up publish directory
 Remove-Item -Path $PublishDir -Recurse -Force
 
-# Cleanup old releases (keep files newer than KeepDays, but always keep at least 1)
+# Cleanup old releases (keep files newer than KeepDays, but always keep at least MinKeep)
 Write-Host "Cleaning up old releases..." -ForegroundColor Green
 $releaseFiles = Get-ChildItem -Path $ReleasesDir -Filter "hugin-irc-server-*.zip" | Sort-Object LastWriteTime -Descending
 
-if ($releaseFiles.Count -gt 1) {
+if ($releaseFiles.Count -gt $MinKeep) {
     $cutoffDate = (Get-Date).AddDays(-$KeepDays)
-    $filesToDelete = $releaseFiles | Select-Object -Skip 1 | Where-Object { $_.LastWriteTime -lt $cutoffDate }
+    $filesToDelete = $releaseFiles | Select-Object -Skip $MinKeep | Where-Object { $_.LastWriteTime -lt $cutoffDate }
     
     foreach ($file in $filesToDelete) {
         Write-Host "  Deleting old release: $($file.Name)" -ForegroundColor DarkGray
@@ -180,9 +230,11 @@ if ($releaseFiles.Count -gt 1) {
     
     if ($filesToDelete.Count -eq 0) {
         Write-Host "  No old releases to clean up." -ForegroundColor DarkGray
+    } else {
+        Write-Host "  Deleted $($filesToDelete.Count) old release(s)." -ForegroundColor DarkGray
     }
 } else {
-    Write-Host "  Only one release exists, keeping it." -ForegroundColor DarkGray
+    Write-Host "  Only $($releaseFiles.Count) release(s) exist, keeping all (MinKeep=$MinKeep)." -ForegroundColor DarkGray
 }
 
 Write-Host ""

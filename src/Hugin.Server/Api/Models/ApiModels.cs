@@ -111,6 +111,11 @@ public sealed class ServerStatusDto
     public required int ConnectedUsers { get; init; }
 
     /// <summary>
+    /// Current number of active channels.
+    /// </summary>
+    public int ActiveChannels { get; init; }
+
+    /// <summary>
     /// Current number of channels.
     /// </summary>
     public required int ChannelCount { get; init; }
@@ -119,6 +124,21 @@ public sealed class ServerStatusDto
     /// Current number of operators online.
     /// </summary>
     public required int OperatorsOnline { get; init; }
+
+    /// <summary>
+    /// TLS port number.
+    /// </summary>
+    public int TlsPort { get; init; }
+
+    /// <summary>
+    /// Maximum allowed connections.
+    /// </summary>
+    public int MaxConnections { get; init; }
+
+    /// <summary>
+    /// Enabled IRCv3 capabilities.
+    /// </summary>
+    public string[] EnabledCapabilities { get; init; } = [];
 
     /// <summary>
     /// Server statistics.

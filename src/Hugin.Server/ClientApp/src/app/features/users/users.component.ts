@@ -211,7 +211,7 @@ import { User, PagedResult } from '@core/models/api.models';
                 <dd class="col-sm-8">{{ selectedUser()?.connectedAt | date:'medium' }}</dd>
                 
                 <dt class="col-sm-4">Inaktiv siden</dt>
-                <dd class="col-sm-8">{{ selectedUser()?.idleTime ? formatDuration(selectedUser()!.idleTime) : '-' }}</dd>
+                <dd class="col-sm-8">{{ selectedUser()?.idleTime ? formatDuration(selectedUser()!.idleTime!) : '-' }}</dd>
                 
                 <dt class="col-sm-4">Kanaler</dt>
                 <dd class="col-sm-8">

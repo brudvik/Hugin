@@ -148,7 +148,7 @@ import { ServerBan } from '@core/models/api.models';
             <div class="card-body">
               <h5><span class="badge bg-warning me-2">K-LINE</span>Lokal utestengelse</h5>
               <p class="text-muted small mb-0">
-                Stenger ute brukere basert på ident@host fra denne serveren.
+                Stenger ute brukere basert på ident&#64;host fra denne serveren.
                 Påvirker kun tilkoblinger til denne serveren.
               </p>
             </div>

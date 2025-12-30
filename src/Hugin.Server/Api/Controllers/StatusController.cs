@@ -213,6 +213,13 @@ public sealed class ServerStatusService : IServerStatusService
             Interlocked.Exchange(ref _peakUsers, userCount);
         }
 
+        // Get configuration values
+        var tlsPort = _configuration.GetValue("Hugin:Ports:Tls", 6697);
+        var maxConnections = _configuration.GetValue("Hugin:Limits:MaxConnections", 1000);
+        
+        // Get enabled capabilities (sample list - in production this would come from CapabilityManager)
+        var enabledCaps = new[] { "multi-prefix", "extended-join", "account-notify", "away-notify", "cap-notify", "message-tags", "server-time", "batch", "sasl" };
+
         var status = new ServerStatusDto
         {
             ServerName = _configuration["Hugin:Server:Name"] ?? "hugin.local",
@@ -221,8 +228,12 @@ public sealed class ServerStatusService : IServerStatusService
             Uptime = DateTimeOffset.UtcNow - StartTime,
             IsRunning = true,
             ConnectedUsers = userCount,
+            ActiveChannels = channelCount,
             ChannelCount = channelCount,
             OperatorsOnline = operatorCount,
+            TlsPort = tlsPort,
+            MaxConnections = maxConnections,
+            EnabledCapabilities = enabledCaps,
             Statistics = new ServerStatisticsDto
             {
                 TotalConnections = Interlocked.Read(ref _totalConnections),

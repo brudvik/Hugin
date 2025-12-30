@@ -1,53 +1,95 @@
 /* Hugin Admin Panel - Global Styles */
-/* Dark Theme with Bootstrap 5 */
+/* Dark Theme inspired by VS Code Dark+ */
+
+// VS Code Dark+ inspired color palette
+$vscode-editor-bg: #1e1e1e;
+$vscode-sidebar-bg: #252526;
+$vscode-panel-bg: #181818;
+$vscode-input-bg: #3c3c3c;
+$vscode-dropdown-bg: #3c3c3c;
+$vscode-button-bg: #0e639c;
+$vscode-button-hover: #1177bb;
+$vscode-button-secondary: #3a3d41;
+$vscode-border: #3c3c3c;
+$vscode-border-light: #454545;
+$vscode-text: #cccccc;
+$vscode-text-light: #e7e7e7;
+$vscode-text-muted: #858585;
+$vscode-accent: #0078d4;
+$vscode-accent-light: #1890ff;
+$vscode-success: #4ec9b0;
+$vscode-warning: #dcdcaa;
+$vscode-error: #f14c4c;
+$vscode-info: #75beff;
 
 // Custom Bootstrap variable overrides
-$primary: #6366f1;
-$secondary: #64748b;
-$success: #22c55e;
-$info: #0ea5e9;
-$warning: #f59e0b;
-$danger: #ef4444;
+$primary: $vscode-accent;
+$secondary: $vscode-button-secondary;
+$success: $vscode-success;
+$info: $vscode-info;
+$warning: $vscode-warning;
+$danger: $vscode-error;
 
-$body-bg: #0f172a;
-$body-color: #e2e8f0;
+$body-bg: $vscode-editor-bg;
+$body-color: $vscode-text;
 
-$card-bg: #1e293b;
-$card-border-color: #334155;
+$card-bg: $vscode-sidebar-bg;
+$card-border-color: $vscode-border;
 
-$input-bg: #1e293b;
-$input-border-color: #475569;
-$input-color: #e2e8f0;
-$input-focus-border-color: $primary;
+$input-bg: $vscode-input-bg;
+$input-border-color: $vscode-border;
+$input-color: $vscode-text-light;
+$input-focus-border-color: $vscode-accent;
+$input-focus-bg: $vscode-input-bg;
+$input-placeholder-color: $vscode-text-muted;
+
+$btn-bg: $vscode-button-bg;
+$btn-border-color: $vscode-button-bg;
 
 $navbar-dark-color: rgba(255, 255, 255, 0.85);
 $navbar-dark-hover-color: rgba(255, 255, 255, 1);
 
-$border-radius: 0.5rem;
-$border-radius-lg: 0.75rem;
-$border-radius-sm: 0.375rem;
+$dropdown-bg: $vscode-dropdown-bg;
+$dropdown-border-color: $vscode-border;
+$dropdown-link-color: $vscode-text;
+$dropdown-link-hover-bg: $vscode-button-secondary;
 
-// Font settings
-$font-family-sans-serif: 'Inter', system-ui, -apple-system, sans-serif;
-$font-size-base: 0.9375rem;
-$line-height-base: 1.6;
+$modal-content-bg: $vscode-sidebar-bg;
+$modal-content-border-color: $vscode-border;
+
+$table-bg: transparent;
+$table-striped-bg: rgba(255, 255, 255, 0.02);
+$table-hover-bg: rgba(255, 255, 255, 0.05);
+$table-border-color: $vscode-border;
+
+$border-radius: 4px;
+$border-radius-lg: 6px;
+$border-radius-sm: 2px;
+
+// Font settings - VS Code uses system fonts
+$font-family-sans-serif: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+$font-family-monospace: 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+$font-size-base: 0.875rem;
+$line-height-base: 1.5;
 
 // Import Bootstrap with overrides
 @import "bootstrap/scss/bootstrap";
 
-// Custom variables
+// Custom variables matching VS Code
 :root {
-  --hugin-bg-primary: #0f172a;
-  --hugin-bg-secondary: #1e293b;
-  --hugin-bg-tertiary: #334155;
-  --hugin-text-primary: #f1f5f9;
-  --hugin-text-secondary: #94a3b8;
-  --hugin-text-muted: #64748b;
-  --hugin-accent: #6366f1;
-  --hugin-accent-hover: #818cf8;
-  --hugin-border: #334155;
-  --hugin-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-  --hugin-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+  --hugin-bg-primary: #{$vscode-editor-bg};
+  --hugin-bg-secondary: #{$vscode-sidebar-bg};
+  --hugin-bg-tertiary: #{$vscode-input-bg};
+  --hugin-bg-panel: #{$vscode-panel-bg};
+  --hugin-text-primary: #{$vscode-text-light};
+  --hugin-text-secondary: #{$vscode-text};
+  --hugin-text-muted: #{$vscode-text-muted};
+  --hugin-accent: #{$vscode-accent};
+  --hugin-accent-hover: #{$vscode-accent-light};
+  --hugin-border: #{$vscode-border};
+  --hugin-border-light: #{$vscode-border-light};
+  --hugin-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
+  --hugin-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 // Global styles
@@ -120,41 +162,41 @@ body {
   }
 }
 
-// Sidebar
+// Sidebar - VS Code activity bar/sidebar style
 .sidebar {
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
   width: 260px;
-  background-color: var(--hugin-bg-secondary);
-  border-right: 1px solid var(--hugin-border);
+  background-color: #252526;
+  border-right: 1px solid #3c3c3c;
   z-index: 1000;
   
   .sidebar-brand {
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--hugin-border);
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #3c3c3c;
     
     .brand-logo {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--hugin-accent);
+      font-size: 1.25rem;
+      font-weight: 400;
+      color: #0078d4;
     }
     
     .brand-text {
-      font-size: 0.75rem;
-      color: var(--hugin-text-muted);
+      font-size: 0.6875rem;
+      color: #858585;
       text-transform: uppercase;
       letter-spacing: 0.1em;
     }
   }
   
   .sidebar-nav {
-    padding: 1rem 0;
+    padding: 0.5rem 0;
     
     .nav-section {
-      padding: 0.5rem 1.5rem;
-      font-size: 0.75rem;
+      padding: 0.5rem 1.25rem;
+      font-size: 0.6875rem;
       font-weight: 600;
       color: var(--hugin-text-muted);
       text-transform: uppercase;
@@ -175,51 +217,54 @@ body {
       }
       
       &:hover {
-        color: var(--hugin-text-primary);
+        color: #e7e7e7;
         background-color: rgba(255, 255, 255, 0.05);
       }
       
       &.active {
-        color: var(--hugin-accent);
-        background-color: rgba(99, 102, 241, 0.1);
-        border-right: 3px solid var(--hugin-accent);
+        color: #ffffff;
+        background-color: #094771;
+        border-left: 2px solid #0078d4;
+        border-right: none;
       }
     }
   }
 }
 
-// Main content
+// Main content - VS Code editor area style
 .main-content {
   margin-left: 260px;
   min-height: 100vh;
   padding: 0;
+  background-color: #1e1e1e;
   
   .content-header {
-    padding: 1.5rem 2rem;
-    background-color: var(--hugin-bg-secondary);
-    border-bottom: 1px solid var(--hugin-border);
+    padding: 1rem 1.5rem;
+    background-color: #252526;
+    border-bottom: 1px solid #3c3c3c;
     
     h1 {
-      font-size: 1.5rem;
-      font-weight: 600;
+      font-size: 1.125rem;
+      font-weight: 400;
       margin: 0;
+      color: #e7e7e7;
     }
     
     .breadcrumb {
       margin: 0;
       padding: 0;
       background: none;
-      font-size: 0.875rem;
+      font-size: 0.8125rem;
       
       .breadcrumb-item {
-        color: var(--hugin-text-muted);
+        color: #858585;
         
         &.active {
-          color: var(--hugin-text-secondary);
+          color: #cccccc;
         }
         
         a {
-          color: var(--hugin-accent);
+          color: #3794ff;
           text-decoration: none;
           
           &:hover {
@@ -231,81 +276,282 @@ body {
   }
   
   .content-body {
-    padding: 2rem;
+    padding: 1.5rem;
   }
 }
 
-// Tables
+// Tables - VS Code list style
 .table {
   --bs-table-bg: transparent;
-  --bs-table-color: var(--hugin-text-primary);
+  --bs-table-color: #cccccc;
   
   thead th {
     font-weight: 600;
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--hugin-text-muted);
-    border-bottom-color: var(--hugin-border);
+    color: #858585;
+    border-bottom-color: #3c3c3c;
+    background-color: #252526;
   }
   
   tbody td {
-    border-bottom-color: var(--hugin-border);
+    border-bottom-color: #2d2d2d;
     vertical-align: middle;
+    font-size: 0.8125rem;
   }
   
   &.table-hover tbody tr:hover {
-    --bs-table-hover-bg: rgba(255, 255, 255, 0.03);
+    --bs-table-hover-bg: #2a2d2e;
   }
 }
 
-// Buttons
+// Buttons - VS Code style
+.btn {
+  font-weight: 400;
+  border-radius: 2px;
+  padding: 0.375rem 0.875rem;
+  transition: background-color 0.1s ease, border-color 0.1s ease;
+}
+
 .btn-primary {
-  --bs-btn-bg: var(--hugin-accent);
-  --bs-btn-border-color: var(--hugin-accent);
-  --bs-btn-hover-bg: var(--hugin-accent-hover);
-  --bs-btn-hover-border-color: var(--hugin-accent-hover);
+  --bs-btn-bg: #0e639c;
+  --bs-btn-border-color: #0e639c;
+  --bs-btn-color: #ffffff;
+  --bs-btn-hover-bg: #1177bb;
+  --bs-btn-hover-border-color: #1177bb;
+  --bs-btn-hover-color: #ffffff;
+  --bs-btn-active-bg: #0d5a8c;
+  --bs-btn-active-border-color: #0d5a8c;
+}
+
+.btn-secondary {
+  --bs-btn-bg: #3a3d41;
+  --bs-btn-border-color: #3a3d41;
+  --bs-btn-color: #cccccc;
+  --bs-btn-hover-bg: #45494e;
+  --bs-btn-hover-border-color: #45494e;
+  --bs-btn-hover-color: #ffffff;
+}
+
+.btn-success {
+  --bs-btn-bg: #388a34;
+  --bs-btn-border-color: #388a34;
+  --bs-btn-hover-bg: #43a03f;
+  --bs-btn-hover-border-color: #43a03f;
+}
+
+.btn-danger {
+  --bs-btn-bg: #d32f2f;
+  --bs-btn-border-color: #d32f2f;
+  --bs-btn-hover-bg: #e53935;
+  --bs-btn-hover-border-color: #e53935;
 }
 
 .btn-outline-secondary {
-  --bs-btn-color: var(--hugin-text-secondary);
-  --bs-btn-border-color: var(--hugin-border);
-  
-  &:hover {
-    --bs-btn-hover-bg: var(--hugin-bg-tertiary);
-    --bs-btn-hover-border-color: var(--hugin-border);
-    --bs-btn-hover-color: var(--hugin-text-primary);
-  }
+  --bs-btn-color: #cccccc;
+  --bs-btn-border-color: #3c3c3c;
+  --bs-btn-hover-bg: #3a3d41;
+  --bs-btn-hover-border-color: #3a3d41;
+  --bs-btn-hover-color: #ffffff;
 }
 
-// Forms
+.btn-outline-primary {
+  --bs-btn-color: #3794ff;
+  --bs-btn-border-color: #3794ff;
+  --bs-btn-hover-bg: #0e639c;
+  --bs-btn-hover-border-color: #0e639c;
+  --bs-btn-hover-color: #ffffff;
+}
+
+// Forms - VS Code style
 .form-control, .form-select {
-  background-color: var(--hugin-bg-primary);
-  border-color: var(--hugin-border);
-  color: var(--hugin-text-primary);
+  background-color: #3c3c3c;
+  border-color: #3c3c3c;
+  color: #cccccc;
+  border-radius: 2px;
   
   &:focus {
-    background-color: var(--hugin-bg-primary);
-    border-color: var(--hugin-accent);
-    color: var(--hugin-text-primary);
-    box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
+    background-color: #3c3c3c;
+    border-color: #007fd4;
+    color: #e7e7e7;
+    box-shadow: none;
+    outline: 1px solid #007fd4;
+    outline-offset: -1px;
   }
   
   &::placeholder {
-    color: var(--hugin-text-muted);
+    color: #858585;
+  }
+  
+  &:disabled {
+    background-color: #2d2d2d;
+    color: #858585;
+  }
+}
+
+.input-group-text {
+  background-color: #3c3c3c;
+  border-color: #3c3c3c;
+  color: #858585;
+  border-radius: 2px;
+}
+
+.input-group {
+  .form-control:focus {
+    z-index: 3;
+  }
+  
+  .btn {
+    border-color: #3c3c3c;
   }
 }
 
 .form-label {
-  font-weight: 500;
-  color: var(--hugin-text-secondary);
-  font-size: 0.875rem;
+  font-weight: 400;
+  color: #cccccc;
+  font-size: 0.8125rem;
+  margin-bottom: 0.375rem;
 }
 
-// Alerts
+.form-check-input {
+  background-color: #3c3c3c;
+  border-color: #3c3c3c;
+  
+  &:checked {
+    background-color: #0e639c;
+    border-color: #0e639c;
+  }
+  
+  &:focus {
+    border-color: #007fd4;
+    box-shadow: none;
+  }
+}
+
+// Alerts - VS Code notifications style
 .alert {
   border: none;
-  border-radius: $border-radius;
+  border-radius: 0;
+  border-left: 3px solid;
+  background-color: #252526;
+  color: #cccccc;
+  
+  &.alert-danger {
+    border-left-color: #f14c4c;
+    background-color: rgba(241, 76, 76, 0.1);
+  }
+  
+  &.alert-warning {
+    border-left-color: #cca700;
+    background-color: rgba(204, 167, 0, 0.1);
+  }
+  
+  &.alert-success {
+    border-left-color: #89d185;
+    background-color: rgba(137, 209, 133, 0.1);
+  }
+  
+  &.alert-info {
+    border-left-color: #75beff;
+    background-color: rgba(117, 190, 255, 0.1);
+  }
+}
+
+// Modals - VS Code style
+.modal-content {
+  background-color: #252526;
+  border: 1px solid #454545;
+  border-radius: 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.modal-header {
+  background-color: #252526;
+  border-bottom: 1px solid #3c3c3c;
+  padding: 0.75rem 1rem;
+  
+  .modal-title {
+    font-size: 0.9375rem;
+    font-weight: 400;
+  }
+  
+  .btn-close {
+    filter: invert(1);
+    opacity: 0.7;
+    
+    &:hover {
+      opacity: 1;
+    }
+  }
+}
+
+.modal-body {
+  padding: 1rem;
+}
+
+.modal-footer {
+  background-color: #252526;
+  border-top: 1px solid #3c3c3c;
+  padding: 0.75rem 1rem;
+}
+
+// Dropdowns - VS Code style
+.dropdown-menu {
+  background-color: #3c3c3c;
+  border: 1px solid #454545;
+  border-radius: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  padding: 0.25rem 0;
+  
+  .dropdown-item {
+    color: #cccccc;
+    padding: 0.375rem 1rem;
+    font-size: 0.8125rem;
+    
+    &:hover, &:focus {
+      background-color: #094771;
+      color: #ffffff;
+    }
+    
+    &.active, &:active {
+      background-color: #094771;
+      color: #ffffff;
+    }
+  }
+  
+  .dropdown-divider {
+    border-color: #454545;
+    margin: 0.25rem 0;
+  }
+}
+
+// Badges - VS Code style
+.badge {
+  font-weight: 400;
+  padding: 0.25rem 0.5rem;
+  border-radius: 2px;
+  
+  &.bg-primary {
+    background-color: #0e639c !important;
+  }
+  
+  &.bg-success {
+    background-color: #388a34 !important;
+  }
+  
+  &.bg-warning {
+    background-color: #9e6a03 !important;
+    color: #ffffff !important;
+  }
+  
+  &.bg-danger {
+    background-color: #d32f2f !important;
+  }
+  
+  &.bg-secondary {
+    background-color: #3a3d41 !important;
+  }
 }
 
 // Setup wizard specific styles
@@ -314,7 +560,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  background: linear-gradient(135deg, #1e1e1e 0%, #252526 100%);
   
   .wizard-container {
     width: 100%;

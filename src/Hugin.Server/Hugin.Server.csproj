@@ -19,7 +19,11 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     
     <!-- SPA settings -->
-    <SpaRoot>wwwroot\</SpaRoot>
+    <SpaRoot>ClientApp\</SpaRoot>
+    <SpaOutputPath>wwwroot\</SpaOutputPath>
+    
+    <!-- Set to false to skip Angular build: dotnet build -p:BuildAngular=false -->
+    <BuildAngular Condition="'$(BuildAngular)' == ''">true</BuildAngular>
   </PropertyGroup>
 
   <!-- Embed icon as Win32 resource -->
@@ -28,11 +32,54 @@
       <Link>hugin-irc-server.ico</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\resources\hugin-irc-server.png">
-      <Link>wwwroot\hugin-logo.png</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <!-- Exclude wwwroot assets from Content to avoid static asset conflicts -->
+    <Content Remove="wwwroot\hugin-logo.png" />
+    <Content Remove="wwwroot\favicon.ico" />
+    <Content Remove="wwwroot\browser\**" />
   </ItemGroup>
+  
+  <!-- Copy favicon and logo to source wwwroot (always runs before Build) -->
+  <Target Name="CopyAssetsToWwwroot" BeforeTargets="Build">
+    <MakeDir Directories="wwwroot" Condition="!Exists('wwwroot')" />
+    <Copy SourceFiles="..\..\resources\hugin-irc-server.ico" 
+          DestinationFiles="wwwroot\favicon.ico" 
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="..\..\resources\hugin-irc-server.png" 
+          DestinationFiles="wwwroot\hugin-logo.png" 
+          SkipUnchangedFiles="true" />
+  </Target>
+  
+  <!-- Build Angular SPA -->
+  <Target Name="BuildAngularSpa" BeforeTargets="Build" AfterTargets="CopyAssetsToWwwroot" Condition="'$(BuildAngular)' == 'true'">
+    <Message Importance="high" Text="Building Angular admin panel..." />
+    
+    <!-- Install npm packages if node_modules doesn't exist -->
+    <Exec WorkingDirectory="$(SpaRoot)" 
+          Command="npm.cmd install" 
+          Condition="!Exists('$(SpaRoot)node_modules')" />
+    
+    <!-- Build Angular app to wwwroot -->
+    <Exec WorkingDirectory="$(SpaRoot)" 
+          Command="npm.cmd run build:prod" />
+    
+    <!-- Copy assets to browser folder after Angular build -->
+    <Copy SourceFiles="..\..\resources\hugin-irc-server.ico" 
+          DestinationFiles="wwwroot\browser\favicon.ico" 
+          SkipUnchangedFiles="true"
+          Condition="Exists('wwwroot\browser')" />
+    <Copy SourceFiles="..\..\resources\hugin-irc-server.png" 
+          DestinationFiles="wwwroot\browser\hugin-logo.png" 
+          SkipUnchangedFiles="true"
+          Condition="Exists('wwwroot\browser')" />
+    
+    <Message Importance="high" Text="Angular admin panel built successfully." />
+  </Target>
+  
+  <!-- Clean Angular build output -->
+  <Target Name="CleanAngularSpa" AfterTargets="Clean">
+    <RemoveDir Directories="$(SpaRoot)dist" />
+    <RemoveDir Directories="$(SpaRoot).angular\cache" />
+  </Target>
 
   <ItemGroup>
     <ProjectReference Include="..\Hugin.Core\Hugin.Core.csproj" />
@@ -60,6 +107,10 @@
     <PackageReference Include="Swashbuckle.AspNetCore" />
     <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" />
     <PackageReference Include="Certes" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>

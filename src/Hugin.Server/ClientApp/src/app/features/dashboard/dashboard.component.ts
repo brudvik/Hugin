@@ -280,15 +280,22 @@ interface StatCard {
     .dashboard-header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       flex-wrap: wrap;
       gap: 1rem;
     }
 
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
     .dashboard-header h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
+      font-size: 1.25rem;
+      font-weight: 400;
       margin-bottom: 0.25rem;
+      color: #e7e7e7;
     }
 
     .status-banner {
@@ -350,7 +357,6 @@ interface StatCard {
     .realtime-indicator.connected {
       background: rgba(16, 185, 129, 0.2);
       color: var(--bs-success);
-    }
     }
 
     .stat-card {
@@ -555,30 +561,31 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   private updateStats(status: ServerStatus): void {
+    const memoryMb = (status.statistics?.memoryUsageBytes || 0) / (1024 * 1024);
     this.stats.set([
       {
         title: 'Tilkoblede brukere',
-        value: status.connectedUsers,
+        value: status.connectedUsers ?? 0,
         icon: 'users',
-        color: 'linear-gradient(135deg, #6366f1, #8b5cf6)'
+        color: 'linear-gradient(135deg, #0e639c, #1177bb)'
       },
       {
         title: 'Aktive kanaler',
-        value: status.activeChannels,
+        value: status.activeChannels ?? status.channelCount ?? 0,
         icon: 'hashtag',
-        color: 'linear-gradient(135deg, #10b981, #059669)'
+        color: 'linear-gradient(135deg, #388a34, #43a03f)'
       },
       {
         title: 'Meldinger/sek',
-        value: '0',
+        value: status.statistics?.messagesPerSecond?.toFixed(1) ?? '0',
         icon: 'comment-dots',
-        color: 'linear-gradient(135deg, #f59e0b, #d97706)'
+        color: 'linear-gradient(135deg, #9e6a03, #b8860b)'
       },
       {
         title: 'Minne (MB)',
-        value: (status.statistics?.memoryUsageBytes || 0) / (1024 * 1024),
+        value: memoryMb > 0 ? memoryMb.toFixed(1) : 'N/A',
         icon: 'microchip',
-        color: 'linear-gradient(135deg, #ec4899, #db2777)'
+        color: 'linear-gradient(135deg, #c026d3, #a21caf)'
       }
     ]);
   }
@@ -613,18 +620,23 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   formatUptime(seconds?: number): string {
-    if (!seconds) return 'N/A';
+    if (seconds === undefined || seconds === null || isNaN(seconds)) return 'N/A';
     
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds);
+    if (secs < 0) return 'N/A';
+    
+    const days = Math.floor(secs / 86400);
+    const hours = Math.floor((secs % 86400) / 3600);
+    const minutes = Math.floor((secs % 3600) / 60);
     
     if (days > 0) {
       return `${days}d ${hours}t`;
     } else if (hours > 0) {
       return `${hours}t ${minutes}m`;
-    } else {
+    } else if (minutes > 0) {
       return `${minutes}m`;
+    } else {
+      return `${secs}s`;
     }
   }
 

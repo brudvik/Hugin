@@ -54,7 +54,7 @@ export interface ServerStatus {
   serverName: string;
   networkName: string;
   version: string;
-  uptime: number;
+  uptime: number; // TimeSpan serialized as total seconds
   isRunning: boolean;
   connectedUsers: number;
   activeChannels: number;
@@ -62,9 +62,9 @@ export interface ServerStatus {
   operatorsOnline: number;
   registeredUsers?: number;
   messagesProcessed?: number;
-  tlsPort?: number;
-  maxConnections?: number;
-  enabledCapabilities?: string[];
+  tlsPort: number;
+  maxConnections: number;
+  enabledCapabilities: string[];
   statistics?: ServerStatistics;
 }
 
@@ -221,6 +221,7 @@ export interface Operator {
   name: string;
   username: string;
   email?: string;
+  password?: string;
   operClass?: string;
   hostmask?: string;
   hostmasks?: string[];

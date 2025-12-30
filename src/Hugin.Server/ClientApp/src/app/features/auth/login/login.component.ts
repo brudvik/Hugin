@@ -110,40 +110,48 @@ import { AuthService } from '@core/services/auth.service';
       align-items: center;
       justify-content: center;
       padding: 2rem;
-      background: linear-gradient(135deg, var(--bg-dark) 0%, #1a1d21 100%);
+      background: #1e1e1e;
     }
 
     .login-card {
       width: 100%;
       max-width: 400px;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 1rem;
-      padding: 2.5rem;
+      background: #252526;
+      border: 1px solid #3c3c3c;
+      border-radius: 6px;
+      padding: 2rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     }
 
     .login-header {
       text-align: center;
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
     }
 
     .login-logo {
-      width: 80px;
-      height: 80px;
+      width: 72px;
+      height: 72px;
       margin: 0 auto 1rem;
-      background: linear-gradient(135deg, var(--bs-primary), var(--bs-info));
-      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2.5rem;
-      color: white;
+    }
+
+    .login-logo img {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
     }
 
     .login-header h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
+      font-size: 1.5rem;
+      font-weight: 400;
       margin-bottom: 0.5rem;
+      color: #e7e7e7;
+    }
+
+    .text-muted {
+      color: #858585 !important;
     }
 
     .login-form {
@@ -153,30 +161,71 @@ import { AuthService } from '@core/services/auth.service';
     .login-footer {
       text-align: center;
       padding-top: 1rem;
-      border-top: 1px solid var(--bs-border-color);
+      border-top: 1px solid #3c3c3c;
     }
 
     .input-group-text {
-      background: var(--bs-dark);
-      border-color: var(--bs-border-color);
-      color: var(--bs-gray-400);
+      background: #3c3c3c;
+      border-color: #3c3c3c;
+      color: #858585;
+      border-radius: 2px;
     }
 
     .form-control {
-      background: var(--bs-dark);
-      border-color: var(--bs-border-color);
-      color: var(--bs-light);
+      background: #3c3c3c;
+      border-color: #3c3c3c;
+      color: #cccccc;
+      border-radius: 2px;
     }
 
     .form-control:focus {
-      background: var(--bs-dark);
-      border-color: var(--bs-primary);
-      color: var(--bs-light);
-      box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+      background: #3c3c3c;
+      border-color: #007fd4;
+      color: #e7e7e7;
+      box-shadow: none;
+      outline: 1px solid #007fd4;
+      outline-offset: -1px;
     }
 
     .form-control::placeholder {
-      color: var(--bs-gray-600);
+      color: #858585;
+    }
+
+    .btn-primary {
+      background-color: #0e639c;
+      border-color: #0e639c;
+      border-radius: 2px;
+    }
+
+    .btn-primary:hover {
+      background-color: #1177bb;
+      border-color: #1177bb;
+    }
+
+    .btn-outline-secondary {
+      color: #858585;
+      border-color: #3c3c3c;
+      border-radius: 2px;
+    }
+
+    .btn-outline-secondary:hover {
+      background-color: #3a3d41;
+      border-color: #3a3d41;
+      color: #cccccc;
+    }
+
+    .form-label {
+      color: #cccccc;
+      font-size: 0.8125rem;
+      font-weight: 400;
+    }
+
+    .alert-danger {
+      background-color: rgba(241, 76, 76, 0.1);
+      border: none;
+      border-left: 3px solid #f14c4c;
+      color: #f14c4c;
+      border-radius: 0;
     }
   `]
 })
@@ -220,7 +269,7 @@ export class LoginComponent {
 
     const { username, password } = this.loginForm.value;
 
-    this.authService.login(username, password).subscribe({
+    this.authService.login({ username, password }).subscribe({
       next: () => {
         const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
         this.router.navigateByUrl(returnUrl);

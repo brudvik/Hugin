@@ -232,7 +232,19 @@ public class Program
         });
         services.AddSingleton<ServerLinkManager>();
         services.AddSingleton<IServerLinkManager>(sp => sp.GetRequiredService<ServerLinkManager>());
-        services.AddSingleton<S2SHandshakeManager>();
+        services.AddSingleton<S2SHandshakeManager>(sp =>
+        {
+            var cfg = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<HuginConfiguration>>().Value;
+            var serverId = sp.GetRequiredService<ServerId>();
+            var connectionManager = sp.GetRequiredService<S2SConnectionManager>();
+            var logger = sp.GetRequiredService<ILogger<S2SHandshakeManager>>();
+            
+            return new S2SHandshakeManager(
+                serverId,
+                cfg.Server.Description,
+                (connectionId, message, ct) => connectionManager.SendToConnectionAsync(connectionId, message.ToString(), ct),
+                logger);
+        });
         services.AddSingleton<IS2SHandshakeManager>(sp => sp.GetRequiredService<S2SHandshakeManager>());
 
         // S2S Command Handlers

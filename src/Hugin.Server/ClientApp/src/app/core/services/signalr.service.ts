@@ -3,7 +3,7 @@
 // Licensed under the MIT License
 
 import { Injectable, inject, signal, computed } from '@angular/core';
-import { HubConnection, HubConnectionBuilder, LogLevel, HubConnectionState } from '@microsoft/signalr';
+import { HubConnection, HubConnectionBuilder, LogLevel, HubConnectionState, IRetryPolicy, RetryContext } from '@microsoft/signalr';
 import { AuthService } from './auth.service';
 import { LogEntry, RealTimeStats, UserEvent, AdminNotification } from '../models/api.models';
 
@@ -69,7 +69,7 @@ export class SignalRService {
           accessTokenFactory: () => token
         })
         .withAutomaticReconnect({
-          nextRetryDelayInMilliseconds: (retryContext) => {
+          nextRetryDelayInMilliseconds: (retryContext: RetryContext) => {
             // Exponential backoff: 0s, 2s, 4s, 8s, 16s, max 30s
             return Math.min(1000 * Math.pow(2, retryContext.previousRetryCount), 30000);
           }

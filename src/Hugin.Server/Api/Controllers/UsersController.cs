@@ -378,10 +378,11 @@ public sealed class ChannelsController : ControllerBase
         var channelList = allChannels.ToList();
         var totalCount = channelList.Count;
         
-        // Get all channel registrations for lookup
-        var channelNames = channelList.Select(c => c.Name.Value.ToUpperInvariant()).ToList();
+        // Get all channel registrations for lookup - load all registrations first, then filter in memory
+        var channelNames = channelList.Select(c => c.Name.Value.ToUpperInvariant()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var registrations = _dbContext.RegisteredChannels
-            .Where(r => channelNames.Contains(r.Name.ToUpperInvariant()))
+            .AsEnumerable()
+            .Where(r => channelNames.Contains(r.Name))
             .ToDictionary(r => r.Name.ToUpperInvariant(), r => r, StringComparer.OrdinalIgnoreCase);
 
         // Paginate

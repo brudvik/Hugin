@@ -255,6 +255,30 @@ public void MethodNameWithConditionReturnsExpectedResult()
 - Index frequently-queried columns
 - Use projections to avoid loading unnecessary data
 
+### Database Migrations
+When making changes to database entities or the DbContext, you **must** create a new EF Core migration:
+
+```powershell
+# Navigate to the Persistence project
+cd src/Hugin.Persistence
+
+# Create a new migration with a descriptive name
+dotnet ef migrations add <MigrationName> --startup-project ../Hugin.Server
+
+# Examples of good migration names:
+# AddServerBansTable
+# AddChannelModeColumn
+# UpdateAccountIndexes
+```
+
+Migrations are applied automatically at server startup when `Database.RunMigrationsOnStartup` is enabled in configuration.
+
+**Important:**
+- Always test migrations locally before committing
+- Never modify existing migrations that have been applied to production
+- Use descriptive names that explain what the migration does
+- Review the generated migration code for correctness
+
 ## Related Projects
 
 - **Munin** - IRC client companion project

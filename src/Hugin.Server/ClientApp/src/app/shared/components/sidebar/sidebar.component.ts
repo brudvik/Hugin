@@ -91,44 +91,55 @@ interface NavItem {
     .sidebar {
       width: 260px;
       height: 100%;
-      background: var(--bs-dark);
-      border-right: 1px solid var(--bs-border-color);
+      background: #181818;
+      border-right: 1px solid #2d2d2d;
     }
 
     .sidebar-brand {
-      padding: 1.5rem;
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--bs-primary);
-      border-bottom: 1px solid var(--bs-border-color);
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      font-size: 1.25rem;
+      font-weight: 400;
+      color: #0078d4;
+      border-bottom: 1px solid #2d2d2d;
     }
 
     .sidebar-nav {
-      padding: 1rem 0;
+      padding: 0.5rem 0;
       overflow-y: auto;
     }
 
     .sidebar-nav .nav-link {
-      padding: 0.75rem 1.5rem;
-      color: var(--bs-gray-400);
-      transition: all 0.2s ease;
-      border-left: 3px solid transparent;
+      display: flex;
+      align-items: center;
+      padding: 0.625rem 1.25rem;
+      color: #cccccc;
+      transition: all 0.1s ease;
+      border-left: 2px solid transparent;
+      font-size: 0.8125rem;
+    }
+
+    .sidebar-nav .nav-link i {
+      width: 20px;
+      text-align: center;
+      font-size: 0.875rem;
     }
 
     .sidebar-nav .nav-link:hover {
-      color: var(--bs-light);
+      color: #ffffff;
       background: rgba(255, 255, 255, 0.05);
     }
 
     .sidebar-nav .nav-link.active {
-      color: var(--bs-primary);
-      background: rgba(var(--bs-primary-rgb), 0.1);
-      border-left-color: var(--bs-primary);
+      color: #ffffff;
+      background: #094771;
+      border-left-color: #0078d4;
     }
 
     .sidebar-status {
-      padding: 1rem 1.5rem;
-      border-top: 1px solid var(--bs-border-color);
+      padding: 0.75rem 1.25rem;
+      border-top: 1px solid #2d2d2d;
     }
 
     .status-dot {
@@ -139,21 +150,45 @@ interface NavItem {
     }
 
     .status-dot.online {
-      background: var(--bs-success);
-      box-shadow: 0 0 8px var(--bs-success);
+      background: #89d185;
+      box-shadow: 0 0 6px #89d185;
     }
 
     .status-dot.offline {
-      background: var(--bs-danger);
+      background: #f14c4c;
     }
 
     .sidebar-footer {
-      padding: 1rem;
-      border-top: 1px solid var(--bs-border-color);
+      padding: 0.75rem;
+      border-top: 1px solid #2d2d2d;
+    }
+
+    .sidebar-footer .btn {
+      background: #2d2d2d;
+      border-color: #2d2d2d;
+      color: #cccccc;
+      font-size: 0.8125rem;
+    }
+
+    .sidebar-footer .btn:hover {
+      background: #3c3c3c;
+      border-color: #3c3c3c;
     }
 
     .dropdown-menu {
       margin-bottom: 0.5rem !important;
+      background: #3c3c3c;
+      border-color: #454545;
+    }
+
+    .dropdown-item {
+      color: #cccccc;
+      font-size: 0.8125rem;
+    }
+
+    .dropdown-item:hover {
+      background: #094771;
+      color: #ffffff;
     }
   `]
 })
@@ -161,7 +196,7 @@ export class SidebarComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
 
-  readonly currentUser = this.authService.currentUser;
+  readonly currentUser = this.authService.user;
   readonly isAdmin = this.authService.isAdmin;
 
   navItems: NavItem[] = [

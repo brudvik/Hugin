@@ -26,9 +26,12 @@ jobs:
         node-version: '20'
         cache: 'npm'
         cache-dependency-path: src/Hugin.Server/ClientApp/package-lock.json
+    - name: Install Angular dependencies
+      working-directory: src/Hugin.Server/ClientApp
+      run: npm ci
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
-      run: dotnet build --no-restore
+      run: dotnet build --no-restore -p:BuildAngular=true
     - name: Test
       run: dotnet test --no-build --verbosity normal

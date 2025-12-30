@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Creates a release build of the Hugin IRC Server.
 
@@ -71,9 +71,9 @@ $PropsFile = Join-Path $RootDir "Directory.Build.props"
 $ReleasesDir = Join-Path $RootDir "releases"
 $PublishDir = Join-Path $RootDir "publish"
 
-Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║               Hugin IRC Server - Release                     ║" -ForegroundColor Cyan
-Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host "================================================================" -ForegroundColor Cyan
+Write-Host "            Hugin IRC Server - Release Builder                  " -ForegroundColor Cyan
+Write-Host "================================================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Ensure releases directory exists
@@ -91,7 +91,7 @@ Write-Host "Current version: $currentVersion" -ForegroundColor Yellow
 if ($Version) {
     # User specified an explicit version
     if ($Version -notmatch '^\d+\.\d+\.\d+$') {
-        Write-Host "Invalid version format: $Version. Expected format: X.Y.Z (e.g., 2.0.0)" -ForegroundColor Red
+        Write-Host "Invalid version format: $Version - Expected format: X.Y.Z" -ForegroundColor Red
         exit 1
     }
     $newVersion = $Version
@@ -130,6 +130,7 @@ Write-Host ""
 
 # Update version in Directory.Build.props (only if version changed)
 $propsContent = Get-Content $PropsFile -Raw
+$versionChanged = $false
 if ($currentVersion -ne $newVersion) {
     $propsContent = $propsContent -replace "<Version>$currentVersion</Version>", "<Version>$newVersion</Version>"
     Set-Content $PropsFile -Value $propsContent -NoNewline
@@ -137,14 +138,13 @@ if ($currentVersion -ne $newVersion) {
     $versionChanged = $true
 } else {
     Write-Host "Version unchanged, rebuilding $currentVersion" -ForegroundColor DarkGray
-    $versionChanged = $false
 }
 
 # Run tests (unless skipped)
 if (-not $SkipTests) {
     Write-Host "Running tests..." -ForegroundColor Green
     dotnet test $SolutionFile --configuration Release --verbosity minimal --nologo
-    
+
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
         Write-Host "Tests FAILED! Reverting version change..." -ForegroundColor Red
@@ -209,7 +209,8 @@ if (-not (Test-Path $zipFilePath)) {
 }
 
 $zipSize = (Get-Item $zipFilePath).Length / 1MB
-Write-Host "Created: $zipFileName ($([math]::Round($zipSize, 2)) MB)" -ForegroundColor Green
+$zipSizeMB = [math]::Round($zipSize, 2)
+Write-Host "Created: $zipFileName - $zipSizeMB MB" -ForegroundColor Green
 Write-Host ""
 
 # Clean up publish directory
@@ -222,28 +223,29 @@ $releaseFiles = Get-ChildItem -Path $ReleasesDir -Filter "hugin-irc-server-*.zip
 if ($releaseFiles.Count -gt $MinKeep) {
     $cutoffDate = (Get-Date).AddDays(-$KeepDays)
     $filesToDelete = $releaseFiles | Select-Object -Skip $MinKeep | Where-Object { $_.LastWriteTime -lt $cutoffDate }
-    
+
     foreach ($file in $filesToDelete) {
         Write-Host "  Deleting old release: $($file.Name)" -ForegroundColor DarkGray
         Remove-Item $file.FullName -Force
     }
-    
-    if ($filesToDelete.Count -eq 0) {
+
+    $deleteCount = @($filesToDelete).Count
+    if ($deleteCount -eq 0) {
         Write-Host "  No old releases to clean up." -ForegroundColor DarkGray
     } else {
-        Write-Host "  Deleted $($filesToDelete.Count) old release(s)." -ForegroundColor DarkGray
+        Write-Host "  Deleted $deleteCount old releases." -ForegroundColor DarkGray
     }
 } else {
-    Write-Host "  Only $($releaseFiles.Count) release(s) exist, keeping all (MinKeep=$MinKeep)." -ForegroundColor DarkGray
+    Write-Host "  Only $($releaseFiles.Count) releases exist, keeping all." -ForegroundColor DarkGray
 }
 
 Write-Host ""
-Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║                   Release Successful!                        ║" -ForegroundColor Green
-Write-Host "╠══════════════════════════════════════════════════════════════╣" -ForegroundColor Green
-Write-Host "║  Version: $newVersion                                            ║" -ForegroundColor Green
-Write-Host "║  File: $zipFileName  ║" -ForegroundColor Green
-Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Green
+Write-Host "================================================================" -ForegroundColor Green
+Write-Host "                   Release Successful!                          " -ForegroundColor Green
+Write-Host "================================================================" -ForegroundColor Green
+Write-Host "  Version: $newVersion" -ForegroundColor Green
+Write-Host "  File: $zipFileName" -ForegroundColor Green
+Write-Host "================================================================" -ForegroundColor Green
 
 # Update CHANGELOG.md with new version section if not already present
 $changelogPath = Join-Path $RootDir "CHANGELOG.md"
@@ -251,8 +253,9 @@ if (Test-Path $changelogPath) {
     $changelogContent = Get-Content $changelogPath -Raw
     $todayFormatted = Get-Date -Format "yyyy-MM-dd"
     $newVersionHeader = "## [$newVersion] - $todayFormatted"
-    
-    if ($changelogContent -notmatch [regex]::Escape("## [$newVersion]")) {
+
+    $escapedVersion = [regex]::Escape("## [$newVersion]")
+    if ($changelogContent -notmatch $escapedVersion) {
         # Add new version section after [Unreleased]
         $changelogContent = $changelogContent -replace "(\[Unreleased\]\s*\r?\n)", "`$1`n$newVersionHeader`n`n"
         Set-Content $changelogPath -Value $changelogContent -NoNewline

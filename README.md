@@ -2,7 +2,7 @@
   <img src="resources/hugin-irc-server.png" alt="Hugin IRC Server" width="128" height="128">
   <h1>🐦 Hugin IRC Server</h1>
   <p>
-    <a href="https://github.com/brudvik/hugin/actions"><img src="https://img.shields.io/github/actions/workflow/status/brudvik/hugin/build.yml?branch=main" alt="Build Status"></a>
+    <a href="https://github.com/brudvik/hugin/actions"><img src="https://img.shields.io/github/actions/workflow/status/brudvik/hugin/dotnet.yml?branch=main" alt="Build Status"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
     <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-8.0-purple.svg" alt=".NET"></a>
   </p>
